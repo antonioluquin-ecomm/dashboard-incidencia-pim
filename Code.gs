@@ -468,7 +468,7 @@ function buildBajasPrioritariasFromPim_(rows) {
     var estado = getPimEstado_(row);
     var baja = isBajaEstado_(estado);
     var facturado = isFacturadoEstado_(estado);
-    var prioridad = facturado ? "Urgente" : Math.abs(diff) >= HIGH_DIFF_THRESHOLD ? "Alta" : baja ? "Media" : "Alta";
+    var prioridad = facturado ? "Urgente" : Math.abs(diff) >= HIGH_DIFF_THRESHOLD ? "Alta" : baja ? "Media" : "Baja";
 
     return {
       nro_pedido_canal: getPimOrder_(row),
@@ -486,7 +486,7 @@ function buildBajasPrioritariasFromPim_(rows) {
       tipo_baja: baja && hasPimPriceDiff_(row) ? "Baja por diferencia" : baja ? "Baja normal" : "Diferencia activa"
     };
   }).sort(function(a, b) {
-    var order = { Urgente: 0, Alta: 1, Media: 2 };
+    var order = { Urgente: 0, Alta: 1, Media: 2, Baja: 3 };
     return order[a.prioridad] - order[b.prioridad] || Math.abs(b.diff) - Math.abs(a.diff);
   });
 }
@@ -652,9 +652,8 @@ function getAny_(row, fields) {
 function getOrderCore_(value) {
   var text = String(value || "").trim();
   if (!text) return "";
-  var match = text.match(/-(\d+)-/);
-  if (match) return match[1];
-  return text.replace(/-01$/, "");
+  // Strip trailing split-order suffix: -01, -02, etc.
+  return text.replace(/-\d{1,2}$/, "");
 }
 
 function normalizeStore_(value) {

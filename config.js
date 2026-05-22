@@ -9,6 +9,7 @@ window.PIM_INCIDENT_CONFIG = {
     bajaItems: 55,
     bajaPedidos: 36
   },
+  // Solo usado en modo CSV. En modo appsScript el valor viene de la API (REFERENCE_TICKET_ACTUAL en Code.gs).
   referenceMetrics: {
     ticketPromedioActual: 135000
   },

@@ -627,7 +627,7 @@
     const valorFacturado = pedidosPim
       .filter((row) => normalizeText(getValue(row, ["Estado Actual", "estado"])) === "facturado")
       .reduce((total, row) => total + toNumber(getValue(row, ["PrecioWEB", "Precio Web", "Valor", "PrecioPIM"])), 0);
-    const ticketActual = (cfg.referenceMetrics && cfg.referenceMetrics.ticketPromedioActual) || 135000;
+    const ticketActual = cfg.referenceMetrics && cfg.referenceMetrics.ticketPromedioActual;
     const ticketError = summary.pedidosError ? montoRechazado / summary.pedidosError : 0;
     const brecha = ticketActual - ticketError;
 

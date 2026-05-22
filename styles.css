@@ -206,6 +206,24 @@ h1 {
   font-size: 25px;
 }
 
+.section-subhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 24px 0 14px;
+}
+
+.section-subhead h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.section-subhead span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .section-note {
   max-width: 560px;
   margin-bottom: 0;
@@ -279,6 +297,10 @@ h1 {
   display: grid;
   grid-template-columns: minmax(320px, .9fr) minmax(420px, 1.3fr);
   gap: 16px;
+}
+
+.lower-grid {
+  margin-top: 16px;
 }
 
 .health-panel {
@@ -357,6 +379,39 @@ h1 {
 
 .breakdown-row:first-child {
   border-top: 0;
+}
+
+.store-row,
+.mini-sku-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 80px 90px 110px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.mini-sku-row {
+  grid-template-columns: minmax(150px, 1fr) 80px 80px 110px;
+}
+
+.store-row:first-child,
+.mini-sku-row:first-child {
+  border-top: 0;
+}
+
+.mini-title {
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-sub {
+  color: var(--quiet);
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 11px;
 }
 
 .bar-track {
@@ -607,6 +662,11 @@ tr.flagged td {
   }
 
   .breakdown-row {
+    grid-template-columns: 1fr;
+  }
+
+  .store-row,
+  .mini-sku-row {
     grid-template-columns: 1fr;
   }
 

@@ -1,6 +1,8 @@
 const CACHE_KEY = "pim_incident_dashboard_v2";
 const CACHE_TTL_SECONDS = 300;
 const HIGH_DIFF_THRESHOLD = 100000;
+const SKU_IMPACT_LIMIT = 120;
+const SHARED_SKU_LIMIT = 50;
 
 const SHEETS = {
   pedidosError: ["pedidos_error", "Pedidos con Error", "1-Pedidos con Error"],
@@ -67,8 +69,11 @@ function buildPayload_() {
     health: health,
     summary: summary,
     paymentBreakdown: buildPaymentBreakdown_(pedidosError.rows),
+    storeBreakdown: buildStoreBreakdown_(pedidosVtex.rows),
     hourlyError: buildHourlyError_(pedidosError.rows),
+    financialImpact: buildFinancialImpact_(pedidosError.rows, pedidosPim.rows, pedidosVtex.rows, darDeBaja.rows, summary),
     skuImpact: skuResumen.rows.length ? buildSkuImpactFromSummary_(skuResumen.rows) : buildSkuImpactFromVtex_(pedidosVtex.rows),
+    skuAmbosSitios: buildSkuAmbosSitios_(pedidosVtex.rows),
     bajasPrioritarias: buildBajasPrioritarias_(darDeBaja.rows),
     cronologia: buildCronologia_(cronologia.rows)
   };
@@ -97,6 +102,64 @@ function buildSummary_(pedidosError, pedidosPim, pedidosVtex, darDeBaja) {
     importePagado: sumRows_(darDeBaja, ["importe_pagado", "Importe Pagado", "pagado"]),
     diferenciaTotal: sumRows_(darDeBaja, ["diff$", "Diff", "diff"])
   };
+}
+
+function buildFinancialImpact_(pedidosError, pedidosPim, pedidosVtex, darDeBaja, summary) {
+  var errorAmount = sumRows_(pedidosVtex, ["SKU Total Price", "Total Value", "Payment Value", "monto"]);
+  var pimValue = sumRows_(pedidosPim, ["PrecioWEB", "Precio Web", "Valor", "PrecioPIM"]);
+  var facturadoValue = pedidosPim.filter(function(row) {
+    return normalizeText_(getAny_(row, ["Estado Actual", "estado"])) === "facturado";
+  }).reduce(function(total, row) {
+    return total + toNumber_(getAny_(row, ["PrecioWEB", "Precio Web", "Valor", "PrecioPIM"]));
+  }, 0);
+  var ticketActual = summary.pedidosVtexUnicos ? errorAmount / summary.pedidosVtexUnicos : 0;
+  var ticketError = summary.pedidosError ? errorAmount / summary.pedidosError : 0;
+  var brecha = ticketActual - ticketError;
+
+  return {
+    montoRechazado: errorAmount,
+    valorTotalPim: pimValue,
+    valorFacturado: facturadoValue,
+    importeCobradoError: summary.importePagado,
+    diferenciaPrecioCorrecto: summary.diferenciaTotal,
+    ticketPromedioActual: ticketActual,
+    ticketPromedioError: ticketError,
+    brechaTicket: brecha,
+    potencialPerdida: Math.abs(brecha) * summary.pedidosError,
+    precioPromedioCorrectoBaja: summary.bajaItems ? (summary.importePagado + Math.abs(summary.diferenciaTotal)) / summary.bajaItems : 0,
+    precioPromedioPagadoBaja: summary.bajaItems ? summary.importePagado / summary.bajaItems : 0
+  };
+}
+
+function buildStoreBreakdown_(rows) {
+  var grouped = {};
+  rows.forEach(function(row) {
+    var store = normalizeStore_(getAny_(row, ["Seller Name", "Tienda", "Host"]));
+    var order = getAny_(row, ["Order", "Nro Pedido", "nro_pedido_canal"]);
+    if (!grouped[store]) {
+      grouped[store] = {
+        tienda: store,
+        pedidosMap: {},
+        unidades: 0,
+        monto: 0
+      };
+    }
+    if (order) grouped[store].pedidosMap[order] = true;
+    grouped[store].unidades += toNumber_(getAny_(row, ["Quantity_SKU", "Cantidad", "cantidad"])) || 1;
+    grouped[store].monto += toNumber_(getAny_(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
+  });
+
+  return Object.keys(grouped).map(function(store) {
+    var item = grouped[store];
+    return {
+      tienda: item.tienda,
+      pedidos: Object.keys(item.pedidosMap).length,
+      unidades: item.unidades,
+      monto: item.monto
+    };
+  }).sort(function(a, b) {
+    return b.monto - a.monto;
+  });
 }
 
 function buildHealth_(sheetResults) {
@@ -159,7 +222,7 @@ function buildHourlyError_(rows) {
   });
 }
 
-function buildSkuImpactFromVtex_(rows) {
+function buildSkuImpactFromVtex_(rows, limit) {
   var grouped = {};
   rows.forEach(function(row) {
     var sku = getAny_(row, ["Reference Code", "SKU", "Sku", "sku", "ID_SKU"]);
@@ -196,7 +259,18 @@ function buildSkuImpactFromVtex_(rows) {
     };
   }).sort(function(a, b) {
     return b.pedidos - a.pedidos;
-  }).slice(0, 200);
+  }).slice(0, limit || SKU_IMPACT_LIMIT);
+}
+
+function buildSkuAmbosSitios_(rows) {
+  return buildSkuImpactFromVtex_(rows, rows.length).filter(function(item) {
+    var sitios = String(item.sitios || "").split(",").map(function(site) {
+      return normalizeStore_(site);
+    }).filter(function(site, index, array) {
+      return site && array.indexOf(site) === index;
+    });
+    return sitios.length > 1;
+  }).slice(0, SHARED_SKU_LIMIT);
 }
 
 function buildSkuImpactFromSummary_(rows) {
@@ -358,6 +432,16 @@ function getAny_(row, fields) {
     }
   }
   return "";
+}
+
+function normalizeStore_(value) {
+  var text = String(value || "Sin dato").trim();
+  var normalized = normalizeText_(text);
+  if (normalized.indexOf("sporting") >= 0) return "Sporting";
+  if (normalized.indexOf("woker") >= 0) return "Woker";
+  if (normalized.indexOf("adidas") >= 0) return "Adidas Producteca";
+  if (normalized.indexOf("b2b") >= 0) return "Ventas B2B";
+  return text || "Sin dato";
 }
 
 function toNumber_(value) {

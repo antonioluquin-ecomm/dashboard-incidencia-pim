@@ -90,8 +90,11 @@ appScriptUrl: "URL_DE_APPS_SCRIPT"
 - `health`: estado de hojas, conteos, columnas faltantes y cache.
 - `summary`: KPIs principales.
 - `paymentBreakdown`: pedidos por medio de pago.
+- `storeBreakdown`: resumen por tienda.
 - `hourlyError`: pedidos con error por hora real.
+- `financialImpact`: montos, tickets promedio y diferencias.
 - `skuImpact`: ranking SKU calculado sin datos personales.
+- `skuAmbosSitios`: SKUs detectados en mas de un sitio.
 - `bajasPrioritarias`: columnas operativas seguras para gestionar bajas.
 
 No se exponen emails, telefonos, documentos, direcciones ni nombres de clientes.

@@ -48,6 +48,12 @@
       <div id="dataHealth"></div>
       <div class="kpi-grid" id="summaryKpis"></div>
 
+      <div class="section-subhead">
+        <h3>Impacto financiero</h3>
+        <span>Montos y brechas principales</span>
+      </div>
+      <div class="kpi-grid" id="financialKpis"></div>
+
       <div class="dashboard-grid">
         <article class="panel">
           <div class="panel-header">
@@ -63,6 +69,24 @@
             <span>Hora real</span>
           </div>
           <div class="hour-chart" id="hourChart"></div>
+        </article>
+      </div>
+
+      <div class="dashboard-grid lower-grid">
+        <article class="panel">
+          <div class="panel-header">
+            <h3>Resumen por tienda</h3>
+            <span>Pedidos, unidades y monto</span>
+          </div>
+          <div id="storeBreakdown"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <h3>SKU en ambos sitios</h3>
+            <span>Top compartidos</span>
+          </div>
+          <div id="sharedSkuPreview"></div>
         </article>
       </div>
     </section>
@@ -125,6 +149,31 @@
       <div class="empty-state" id="skuEmpty">
         <h3>Sin ranking SKU disponible</h3>
         <p>Revisar que la hoja <strong>pedidos_vtex</strong> tenga SKU, producto, cantidad y pedido.</p>
+      </div>
+
+      <div class="section-subhead">
+        <h3>SKUs presentes en ambos sitios</h3>
+        <span>Catálogo compartido afectado</span>
+      </div>
+      <div class="table-wrap hidden" id="sharedSkuTableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Producto</th>
+              <th>Sitios</th>
+              <th class="td-right">Pedidos</th>
+              <th class="td-right">Unidades</th>
+              <th class="td-right">Monto</th>
+            </tr>
+          </thead>
+          <tbody id="tbodySharedSku"></tbody>
+        </table>
+      </div>
+
+      <div class="section-subhead">
+        <h3>Ranking general SKU</h3>
+        <span>Top por pedidos</span>
       </div>
       <div class="table-wrap hidden" id="skuTableWrap">
         <table>

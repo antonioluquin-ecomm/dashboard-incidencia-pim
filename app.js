@@ -6,8 +6,11 @@
     summary: {},
     health: null,
     paymentBreakdown: [],
+    storeBreakdown: [],
     hourlyError: [],
+    financialImpact: {},
     skuImpact: [],
+    skuAmbosSitios: [],
     bajasPrioritarias: [],
     cronologia: [],
     pedidosError: [],
@@ -101,8 +104,11 @@
       health: payload.health,
       summary: payload.summary,
       paymentBreakdown: payload.paymentBreakdown || [],
+      storeBreakdown: payload.storeBreakdown || [],
       hourlyError: payload.hourlyError || [],
+      financialImpact: payload.financialImpact || {},
       skuImpact: payload.skuImpact || [],
+      skuAmbosSitios: payload.skuAmbosSitios || [],
       bajasPrioritarias: payload.bajasPrioritarias || [],
       cronologia: payload.cronologia || []
     };
@@ -112,8 +118,11 @@
     state.summary = payload.summary || {};
     state.health = payload.health || null;
     state.paymentBreakdown = payload.paymentBreakdown || [];
+    state.storeBreakdown = payload.storeBreakdown || [];
     state.hourlyError = payload.hourlyError || [];
+    state.financialImpact = payload.financialImpact || {};
     state.skuImpact = payload.skuImpact || [];
+    state.skuAmbosSitios = payload.skuAmbosSitios || [];
     state.bajasPrioritarias = payload.bajasPrioritarias || [];
     state.cronologia = payload.cronologia || [];
     state.pedidosError = payload.pedidosError || [];
@@ -131,8 +140,11 @@
       summary,
       health: buildLegacyHealth(pedidosError, pedidosPim, pedidosVtex, darDeBaja),
       paymentBreakdown: buildPaymentBreakdown(pedidosError),
+      storeBreakdown: buildStoreBreakdown(pedidosVtex),
       hourlyError: buildHourlyError(pedidosError),
+      financialImpact: buildFinancialImpact(pedidosError, pedidosPim, pedidosVtex, darDeBaja, summary),
       skuImpact: normalizeRows(payload.skuResumen || []).length ? normalizeSkuRows(payload.skuResumen) : buildSkuFromVtex(pedidosVtex),
+      skuAmbosSitios: buildSkuFromVtex(pedidosVtex).filter((item) => splitSites(item.sitios).length > 1).slice(0, 50),
       bajasPrioritarias: buildBajasPrioritarias(darDeBaja),
       cronologia: normalizeCronologia(payload.cronologia || []),
       pedidosError
@@ -147,7 +159,10 @@
     renderRiskStrip();
     renderHealth();
     renderSummaryKpis();
+    renderFinancialKpis();
     renderPaymentBreakdown();
+    renderStoreBreakdown();
+    renderSharedSkuPreview();
     renderHourChart();
     renderPedidosError();
     renderTimeline();
@@ -216,6 +231,20 @@
     ].join("");
   }
 
+  function renderFinancialKpis() {
+    const f = state.financialImpact || {};
+    $("#financialKpis").innerHTML = [
+      kpi("Monto rechazado", fmtMoney(f.montoRechazado), "Pedidos VTEX vinculados", "red"),
+      kpi("Valor total PIM", fmtMoney(f.valorTotalPim), "Items ingresados a PIM", "blue"),
+      kpi("Valor facturado", fmtMoney(f.valorFacturado), "Pedidos facturados", "green"),
+      kpi("Importe cobrado error", fmtMoney(f.importeCobradoError), "Base dar de baja", "orange"),
+      kpi("Diferencia vs correcto", fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto))), "Precio correcto - pagado", "red"),
+      kpi("Ticket prom. error", fmtMoney(f.ticketPromedioError), "Monto rechazado / pedidos error", "purple"),
+      kpi("Precio prom. correcto", fmtMoney(f.precioPromedioCorrectoBaja), "Items de baja", "orange"),
+      kpi("Precio prom. pagado", fmtMoney(f.precioPromedioPagadoBaja), "Items de baja", "red")
+    ].join("");
+  }
+
   function renderPaymentBreakdown() {
     const entries = state.paymentBreakdown || [];
     const total = state.summary.pedidosError || entries.reduce((sum, row) => sum + toNumber(row.pedidos), 0);
@@ -235,6 +264,37 @@
           <div class="td-right td-mono">${pct(count, total)}</div>
         </div>`;
     }).join("") : `<p class="section-note">Sin medios de pago cargados.</p>`;
+  }
+
+  function renderStoreBreakdown() {
+    const rows = state.storeBreakdown || [];
+    const max = Math.max(...rows.map((row) => toNumber(row.monto)), 1);
+    $("#storeBreakdown").innerHTML = rows.length ? rows.map((row) => `
+      <div class="store-row">
+        <div>
+          <strong>${escapeHtml(row.tienda || "Sin dato")}</strong>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(toNumber(row.monto) / max * 100)}%"></div></div>
+        </div>
+        <div class="td-right td-mono">${fmt(row.pedidos)}</div>
+        <div class="td-right td-mono">${fmt(row.unidades)}</div>
+        <div class="td-right td-mono">${fmtMoney(row.monto)}</div>
+      </div>
+    `).join("") : `<p class="section-note">Sin datos de tienda disponibles.</p>`;
+  }
+
+  function renderSharedSkuPreview() {
+    const rows = (state.skuAmbosSitios || []).slice(0, 6);
+    $("#sharedSkuPreview").innerHTML = rows.length ? rows.map((row) => `
+      <div class="mini-sku-row">
+        <div>
+          <div class="mini-title">${escapeHtml(row.producto || row.sku)}</div>
+          <div class="mini-sub">${escapeHtml(row.sku)} - ${escapeHtml(row.sitios || "Ambos")}</div>
+        </div>
+        <div class="td-right td-mono">${fmt(row.pedidos)}</div>
+        <div class="td-right td-mono">${fmt(row.unidades)}</div>
+        <div class="td-right td-mono">${fmtMoney(row.monto)}</div>
+      </div>
+    `).join("") : `<p class="section-note">No se detectaron SKUs compartidos entre sitios.</p>`;
   }
 
   function renderHourChart() {
@@ -291,8 +351,20 @@
 
   function renderSku() {
     const rows = state.skuImpact || [];
+    const sharedRows = state.skuAmbosSitios || [];
     $("#skuEmpty").classList.toggle("hidden", rows.length > 0);
     $("#skuTableWrap").classList.toggle("hidden", rows.length === 0);
+    $("#sharedSkuTableWrap").classList.toggle("hidden", sharedRows.length === 0);
+    $("#tbodySharedSku").innerHTML = sharedRows.map((row) => `
+      <tr>
+        <td class="td-mono">${escapeHtml(row.sku)}</td>
+        <td>${escapeHtml(row.producto)}</td>
+        <td>${escapeHtml(row.sitios)}</td>
+        <td class="td-right td-mono">${fmt(row.pedidos)}</td>
+        <td class="td-right td-mono">${fmt(row.unidades)}</td>
+        <td class="td-right td-mono">${fmtMoney(row.monto)}</td>
+      </tr>
+    `).join("");
     $("#tbodySku").innerHTML = rows.map((row) => `
       <tr>
         <td class="td-mono">${escapeHtml(row.sku)}</td>
@@ -453,6 +525,31 @@
     };
   }
 
+  function buildFinancialImpact(pedidosError, pedidosPim, pedidosVtex, darDeBaja, summary) {
+    const montoRechazado = sumBy(pedidosVtex, ["SKU Total Price", "Total Value", "Payment Value", "monto"]);
+    const valorTotalPim = sumBy(pedidosPim, ["PrecioWEB", "Precio Web", "Valor", "PrecioPIM"]);
+    const valorFacturado = pedidosPim
+      .filter((row) => normalizeText(getValue(row, ["Estado Actual", "estado"])) === "facturado")
+      .reduce((total, row) => total + toNumber(getValue(row, ["PrecioWEB", "Precio Web", "Valor", "PrecioPIM"])), 0);
+    const ticketActual = summary.pedidosVtexUnicos ? montoRechazado / summary.pedidosVtexUnicos : 0;
+    const ticketError = summary.pedidosError ? montoRechazado / summary.pedidosError : 0;
+    const brecha = ticketActual - ticketError;
+
+    return {
+      montoRechazado,
+      valorTotalPim,
+      valorFacturado,
+      importeCobradoError: summary.importePagado,
+      diferenciaPrecioCorrecto: summary.diferenciaTotal,
+      ticketPromedioActual: ticketActual,
+      ticketPromedioError: ticketError,
+      brechaTicket: brecha,
+      potencialPerdida: Math.abs(brecha) * summary.pedidosError,
+      precioPromedioCorrectoBaja: summary.bajaItems ? (summary.importePagado + Math.abs(summary.diferenciaTotal)) / summary.bajaItems : 0,
+      precioPromedioPagadoBaja: summary.bajaItems ? summary.importePagado / summary.bajaItems : 0
+    };
+  }
+
   function buildLegacyHealth(pedidosError, pedidosPim, pedidosVtex, darDeBaja) {
     return {
       status: "ok",
@@ -475,6 +572,24 @@
       groups[tipo].pedidos += 1;
     });
     return Object.values(groups).sort((a, b) => b.pedidos - a.pedidos);
+  }
+
+  function buildStoreBreakdown(rows) {
+    const grouped = {};
+    rows.forEach((row) => {
+      const tienda = normalizeStore(getValue(row, ["Seller Name", "Tienda", "Host"]));
+      const order = getValue(row, ["Order", "Nro Pedido", "nro_pedido_canal"]);
+      if (!grouped[tienda]) grouped[tienda] = { tienda, pedidos: new Set(), unidades: 0, monto: 0 };
+      if (order) grouped[tienda].pedidos.add(order);
+      grouped[tienda].unidades += toNumber(getValue(row, ["Quantity_SKU", "Cantidad", "cantidad"])) || 1;
+      grouped[tienda].monto += toNumber(getValue(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
+    });
+    return Object.values(grouped).map((item) => ({
+      tienda: item.tienda,
+      pedidos: item.pedidos.size,
+      unidades: item.unidades,
+      monto: item.monto
+    })).sort((a, b) => b.monto - a.monto);
   }
 
   function buildHourlyError(rows) {
@@ -699,6 +814,20 @@
 
   function normalizeHeader(value) {
     return String(value || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  function normalizeStore(value) {
+    const text = String(value || "Sin dato").trim();
+    const normalized = normalizeText(text);
+    if (normalized.includes("sporting")) return "Sporting";
+    if (normalized.includes("woker")) return "Woker";
+    if (normalized.includes("adidas")) return "Adidas Producteca";
+    if (normalized.includes("b2b")) return "Ventas B2B";
+    return text || "Sin dato";
+  }
+
+  function splitSites(value) {
+    return String(value || "").split(",").map(normalizeStore).filter((site, index, array) => site && array.indexOf(site) === index);
   }
 
   function normalizeText(value) {

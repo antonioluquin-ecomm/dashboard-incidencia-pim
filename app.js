@@ -2,6 +2,24 @@
   const cfg = window.PIM_INCIDENT_CONFIG;
   const manualPayments = new Set((cfg.manualPaymentMethods || []).map(normalizeText));
 
+  const UNLOCK_MAX_ATTEMPTS = 5;
+  const UNLOCK_LOCKOUT_MS = 5 * 60 * 1000;
+
+  function getUnlockLockState() {
+    try {
+      const raw = localStorage.getItem("pim_unlock_lock");
+      return raw ? JSON.parse(raw) : { attempts: 0, lockedUntil: 0 };
+    } catch (e) {
+      return { attempts: 0, lockedUntil: 0 };
+    }
+  }
+  function setUnlockLockState(s) {
+    try { localStorage.setItem("pim_unlock_lock", JSON.stringify(s)); } catch (e) {}
+  }
+  function resetUnlockLockState() {
+    try { localStorage.removeItem("pim_unlock_lock"); } catch (e) {}
+  }
+
   const state = {
     summary: {},
     health: null,
@@ -134,6 +152,14 @@
       return;
     }
 
+    const lockState = getUnlockLockState();
+    if (lockState.lockedUntil > Date.now()) {
+      const mins = Math.ceil((lockState.lockedUntil - Date.now()) / 60000);
+      status.textContent = `Demasiados intentos. Esperar ${mins} min.`;
+      status.className = "unlock-status error";
+      return;
+    }
+
     $("#unlockErrorsButton").disabled = true;
     status.textContent = "Validando...";
     status.className = "unlock-status";
@@ -146,6 +172,7 @@
       const payload = await response.json();
       if (payload.error) throw new Error(payload.error);
 
+      resetUnlockLockState();
       state.pedidosError = normalizeRows(payload.pedidosErrorDetalle || []);
       state.pedidosErrorUnlocked = true;
       state.filters.errores.page = 1;
@@ -156,7 +183,18 @@
     } catch (error) {
       state.pedidosErrorUnlocked = false;
       state.pedidosError = [];
-      status.textContent = error.message;
+
+      const ls = getUnlockLockState();
+      ls.attempts = (ls.attempts || 0) + 1;
+      if (ls.attempts >= UNLOCK_MAX_ATTEMPTS) {
+        ls.lockedUntil = Date.now() + UNLOCK_LOCKOUT_MS;
+        ls.attempts = 0;
+        status.textContent = "Demasiados intentos. Bloqueado 5 min.";
+      } else {
+        const left = UNLOCK_MAX_ATTEMPTS - ls.attempts;
+        status.textContent = `${error.message} (${left} intento${left !== 1 ? "s" : ""} restante${left !== 1 ? "s" : ""})`;
+      }
+      setUnlockLockState(ls);
       status.className = "unlock-status error";
       renderPedidosError();
     } finally {

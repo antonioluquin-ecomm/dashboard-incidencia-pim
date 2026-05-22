@@ -21,6 +21,19 @@ const REQUIRED_COLUMNS = {
 
 const MANUAL_PAYMENT_METHODS = ["mercado_pago_pro", "gocuotas"];
 
+// Canonical field-alias lists. Add new source column names here; no other file needs to change.
+const FIELDS = {
+  orderId:  ["nro_pedido_canal", "Order", "Nro Pedido", "Nro pedido"],
+  payment:  ["tipo_pago", "Payment System Name", "Medio de Pago"],
+  amount:   ["SKU Total Price", "Total Value", "Payment Value", "monto"],
+  quantity: ["Quantity_SKU", "Cantidad", "cantidad", "Cant.", "Cant"],
+  store:    ["Seller Name", "Tienda", "Host"],
+  sku:      ["sku", "SKU", "Sku", "Reference Code", "ID_SKU"],
+  producto: ["producto", "Producto", "SKU Name"],
+  estado:   ["Estado Actual", "Estado", "estado"],
+  fechaAlta: ["fecha_alta", "Fecha Alta", "fecha_alta.1", "Creation Date"]
+};
+
 function doGet(e) {
   try {
     if (e && e.parameter && e.parameter.view === "pedidos_error") {
@@ -77,13 +90,13 @@ function buildProtectedPedidosError_(password) {
   return {
     updatedAt: new Date().toISOString(),
     pedidosErrorDetalle: pedidosError.rows.map(function(row) {
-      var order = getAny_(row, ["nro_pedido_canal", "Order", "Nro Pedido"]);
+      var order = getAny_(row, FIELDS.orderId);
       var core = getOrderCore_(order);
       var meta = vtexByOrder[core] || {};
-      var payment = getAny_(row, ["tipo_pago", "Payment System Name", "Medio de Pago"]);
+      var payment = getAny_(row, FIELDS.payment);
 
       return {
-        fecha_alta: getAny_(row, ["fecha_alta", "Fecha Alta", "fecha_alta.1"]),
+        fecha_alta: getAny_(row, FIELDS.fechaAlta),
         nro_pedido_canal: order,
         tipo_pago: payment,
         hora_real: getRealHour_(row),
@@ -132,7 +145,7 @@ function buildPayload_() {
 
 function buildSummary_(pedidosError, pedidosPim, pedidosVtex, pedidosVtexError) {
   var manual = pedidosError.filter(function(row) {
-    return MANUAL_PAYMENT_METHODS.indexOf(normalizeText_(getAny_(row, ["tipo_pago", "Payment System Name", "Medio de Pago"]))) >= 0;
+    return MANUAL_PAYMENT_METHODS.indexOf(normalizeText_(getAny_(row, FIELDS.payment))) >= 0;
   }).length;
   var pedidoPimIds = uniqueValues_(pedidosPim, ["Nro Pedido", "nro_pedido_canal", "Nro pedido"]);
   var pedidoVtexIds = uniqueValues_(pedidosVtex, ["Order", "Nro Pedido", "nro_pedido_canal"]);
@@ -175,7 +188,7 @@ function buildFinancialImpact_(pedidosError, pedidosPim, pedidosVtexError, summa
   var errorAmount = summary.montoRechazado || sumRows_(pedidosVtexError, ["SKU Total Price", "Total Value", "Payment Value", "monto"]);
   var pimValue = sumRows_(pedidosPim, ["PrecioWEB", "Precio WEB", "Precio Web", "Valor", "PrecioPIM", "Precio PIM"]);
   var facturadoValue = pedidosPim.filter(function(row) {
-    return normalizeText_(getAny_(row, ["Estado Actual", "Estado", "estado"])) === "facturado";
+    return normalizeText_(getAny_(row, FIELDS.estado)) === "facturado";
   }).reduce(function(total, row) {
     return total + toNumber_(getAny_(row, ["PrecioWEB", "Precio WEB", "Precio Web", "Valor", "PrecioPIM", "Precio PIM"]));
   }, 0);
@@ -202,8 +215,8 @@ function buildFinancialImpact_(pedidosError, pedidosPim, pedidosVtexError, summa
 function buildStoreBreakdown_(rows) {
   var grouped = {};
   rows.forEach(function(row) {
-    var store = normalizeStore_(getAny_(row, ["Seller Name", "Tienda", "Host"]));
-    var order = getAny_(row, ["Order", "Nro Pedido", "nro_pedido_canal"]);
+    var store = normalizeStore_(getAny_(row, FIELDS.store));
+    var order = getAny_(row, FIELDS.orderId);
     if (!grouped[store]) {
       grouped[store] = {
         tienda: store,
@@ -213,8 +226,8 @@ function buildStoreBreakdown_(rows) {
       };
     }
     if (order) grouped[store].pedidosMap[order] = true;
-    grouped[store].unidades += toNumber_(getAny_(row, ["Quantity_SKU", "Cantidad", "cantidad"])) || 1;
-    grouped[store].monto += toNumber_(getAny_(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
+    grouped[store].unidades += toNumber_(getAny_(row, FIELDS.quantity)) || 1;
+    grouped[store].monto += toNumber_(getAny_(row, FIELDS.amount));
   });
 
   return Object.keys(grouped).map(function(store) {
@@ -256,8 +269,8 @@ function buildPaymentBreakdown_(rows, pedidosVtexError) {
   var groups = {};
   var amountByOrder = buildAmountByOrder_(pedidosVtexError);
   rows.forEach(function(row) {
-    var payment = getAny_(row, ["tipo_pago", "Payment System Name", "Medio de Pago"]) || "Sin dato";
-    var orderCore = getOrderCore_(getAny_(row, ["nro_pedido_canal", "Order", "Nro Pedido"]));
+    var payment = getAny_(row, FIELDS.payment) || "Sin dato";
+    var orderCore = getOrderCore_(getAny_(row, FIELDS.orderId));
     var key = String(payment);
     if (!groups[key]) {
       groups[key] = {
@@ -297,12 +310,12 @@ function buildHourlyError_(rows) {
 function filterVtexByPedidosError_(pedidosVtex, pedidosError) {
   var errorOrders = {};
   pedidosError.forEach(function(row) {
-    var core = getOrderCore_(getAny_(row, ["nro_pedido_canal", "Order", "Nro Pedido"]));
+    var core = getOrderCore_(getAny_(row, FIELDS.orderId));
     if (core) errorOrders[core] = true;
   });
 
   return pedidosVtex.filter(function(row) {
-    var core = getOrderCore_(getAny_(row, ["Order", "Nro Pedido", "nro_pedido_canal"]));
+    var core = getOrderCore_(getAny_(row, FIELDS.orderId));
     return !!errorOrders[core];
   });
 }
@@ -310,9 +323,9 @@ function filterVtexByPedidosError_(pedidosVtex, pedidosError) {
 function buildAmountByOrder_(rows) {
   var totals = {};
   rows.forEach(function(row) {
-    var core = getOrderCore_(getAny_(row, ["Order", "Nro Pedido", "nro_pedido_canal"]));
+    var core = getOrderCore_(getAny_(row, FIELDS.orderId));
     if (!core) return;
-    totals[core] = (totals[core] || 0) + toNumber_(getAny_(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
+    totals[core] = (totals[core] || 0) + toNumber_(getAny_(row, FIELDS.amount));
   });
   return totals;
 }
@@ -320,7 +333,7 @@ function buildAmountByOrder_(rows) {
 function buildVtexMetaByOrder_(rows) {
   var meta = {};
   rows.forEach(function(row) {
-    var core = getOrderCore_(getAny_(row, ["Order", "Nro Pedido", "nro_pedido_canal"]));
+    var core = getOrderCore_(getAny_(row, FIELDS.orderId));
     if (!core) return;
     if (!meta[core]) {
       meta[core] = {
@@ -330,11 +343,11 @@ function buildVtexMetaByOrder_(rows) {
         monto: 0
       };
     }
-    var sitio = normalizeStore_(getAny_(row, ["Seller Name", "Tienda", "Host"]));
+    var sitio = normalizeStore_(getAny_(row, FIELDS.store));
     if (sitio) meta[core].sitios[sitio] = true;
     meta[core].sitio = Object.keys(meta[core].sitios).join(", ");
-    meta[core].unidades += toNumber_(getAny_(row, ["Quantity_SKU", "Cantidad", "cantidad"])) || 1;
-    meta[core].monto += toNumber_(getAny_(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
+    meta[core].unidades += toNumber_(getAny_(row, FIELDS.quantity)) || 1;
+    meta[core].monto += toNumber_(getAny_(row, FIELDS.amount));
   });
   return meta;
 }
@@ -342,13 +355,13 @@ function buildVtexMetaByOrder_(rows) {
 function buildSkuImpactFromVtex_(rows, limit) {
   var grouped = {};
   rows.forEach(function(row) {
-    var sku = getAny_(row, ["Reference Code", "SKU", "Sku", "sku", "ID_SKU"]);
+    var sku = getAny_(row, FIELDS.sku);
     if (!sku) return;
 
     if (!grouped[sku]) {
       grouped[sku] = {
         sku: sku,
-        producto: getAny_(row, ["SKU Name", "Producto", "producto"]),
+        producto: getAny_(row, FIELDS.producto),
         sitiosMap: {},
         pedidosMap: {},
         unidades: 0,
@@ -356,12 +369,12 @@ function buildSkuImpactFromVtex_(rows, limit) {
       };
     }
 
-    var seller = getAny_(row, ["Seller Name", "Tienda", "Host"]);
-    var order = getAny_(row, ["Order", "Nro Pedido", "nro_pedido_canal"]);
+    var seller = getAny_(row, FIELDS.store);
+    var order = getAny_(row, FIELDS.orderId);
     if (seller) grouped[sku].sitiosMap[seller] = true;
     if (order) grouped[sku].pedidosMap[order] = true;
-    grouped[sku].unidades += toNumber_(getAny_(row, ["Quantity_SKU", "Cantidad", "cantidad"])) || 1;
-    grouped[sku].monto += toNumber_(getAny_(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
+    grouped[sku].unidades += toNumber_(getAny_(row, FIELDS.quantity)) || 1;
+    grouped[sku].monto += toNumber_(getAny_(row, FIELDS.amount));
   });
 
   return Object.keys(grouped).map(function(sku) {
@@ -382,8 +395,8 @@ function buildSkuImpactFromVtex_(rows, limit) {
 function buildSkuImpactFromSummary_(rows) {
   return rows.map(function(row) {
     return {
-      sku: getAny_(row, ["sku", "SKU", "Reference Code"]),
-      producto: getAny_(row, ["producto", "Producto", "SKU Name"]),
+      sku: getAny_(row, FIELDS.sku),
+      producto: getAny_(row, FIELDS.producto),
       sitios: getAny_(row, ["sitios", "Sitios", "Tienda"]),
       pedidos: toNumber_(getAny_(row, ["pedidos", "Pedidos"])),
       unidades: toNumber_(getAny_(row, ["unidades", "Unidades", "Cantidad"])),
@@ -482,9 +495,9 @@ function buildBajasPrioritariasFromPim_(rows) {
 
     return {
       nro_pedido_canal: getPimOrder_(row),
-      sku: getAny_(row, ["sku", "SKU", "Sku", "Reference Code"]),
-      producto: getAny_(row, ["producto", "Producto", "SKU Name"]),
-      cantidad: toNumber_(getAny_(row, ["cantidad", "Cantidad", "Cant.", "Cant", "Quantity_SKU"])) || 1,
+      sku: getAny_(row, FIELDS.sku),
+      producto: getAny_(row, FIELDS.producto),
+      cantidad: toNumber_(getAny_(row, FIELDS.quantity)) || 1,
       importe_pagado: getPimPaidPrice_(row),
       precio_actual: getPimCorrectPrice_(row),
       diff: diff,
@@ -514,11 +527,11 @@ function buildCronologia_(rows) {
 }
 
 function getPimOrder_(row) {
-  return getAny_(row, ["Nro Pedido", "nro_pedido_canal", "Nro pedido", "Order"]);
+  return getAny_(row, FIELDS.orderId);
 }
 
 function getPimEstado_(row) {
-  return getAny_(row, ["Estado Actual", "Estado", "estado"]);
+  return getAny_(row, FIELDS.estado);
 }
 
 function getPimPaidPrice_(row) {
@@ -649,7 +662,7 @@ function getRealHour_(row) {
   var explicit = getAny_(row, ["Hora real", "hora_real", "Hora Real"]);
   if (explicit !== "") return String(explicit);
 
-  var dateValue = getAny_(row, ["fecha_alta", "Fecha Alta", "Creation Date"]);
+  var dateValue = getAny_(row, FIELDS.fechaAlta);
   if (!dateValue) return "";
 
   var match = String(dateValue).match(/\s(\d{1,2}):/);

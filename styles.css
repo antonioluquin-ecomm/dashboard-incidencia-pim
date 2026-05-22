@@ -243,6 +243,49 @@ h1 {
   line-height: 1.5;
 }
 
+.story-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.story-card {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.story-card h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.story-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.story-card strong {
+  color: var(--text);
+}
+
+.explain-box {
+  margin: -8px 0 24px;
+  padding: 16px 18px;
+  border: 1px solid rgba(85,167,255,.28);
+  border-radius: 8px;
+  background: rgba(85,167,255,.08);
+  color: #c9defa;
+  line-height: 1.55;
+}
+
+.explain-box strong {
+  color: var(--text);
+}
+
 .notice.error {
   border-color: rgba(239,91,87,.4);
   background: rgba(239,91,87,.11);
@@ -633,7 +676,8 @@ tr.flagged td {
 @media (max-width: 860px) {
   .site-header,
   .section-heading,
-  .dashboard-grid {
+  .dashboard-grid,
+  .story-grid {
     grid-template-columns: 1fr;
   }
 

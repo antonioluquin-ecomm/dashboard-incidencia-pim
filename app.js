@@ -157,9 +157,11 @@
 
   function renderAll() {
     renderRiskStrip();
+    renderExecutiveStory();
     renderHealth();
     renderSummaryKpis();
     renderFinancialKpis();
+    renderFinancialExplanation();
     renderPaymentBreakdown();
     renderStoreBreakdown();
     renderSharedSkuPreview();
@@ -181,6 +183,30 @@
     $("#riskStrip").innerHTML = warning
       ? `<strong>Base con alertas:</strong> revisar columnas faltantes en Estado de datos. El tablero sigue mostrando lo disponible.`
       : `<strong>Base conectada:</strong> ${parts.join(", ") || "sin datos visibles todavia"}. Actualizar el Google Sheet refresca este tablero.`;
+  }
+
+  function renderExecutiveStory() {
+    const s = state.summary || {};
+    const f = state.financialImpact || {};
+    $("#executiveStory").innerHTML = [
+      {
+        title: "Que paso",
+        text: `Se detectaron <strong>${fmt(s.pedidosError)}</strong> pedidos que no pudieron avanzar correctamente por problemas de precio y stock. Esos pedidos concentran <strong>${fmt(s.unidadesRechazadas)}</strong> unidades rechazadas.`
+      },
+      {
+        title: "Donde impacta",
+        text: `El monto comercial asociado al incidente es de <strong>${fmtMoney(f.montoRechazado)}</strong>. La diferencia confirmada en pedidos a dar de baja es de <strong>${fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto)))}</strong>.`
+      },
+      {
+        title: "Que hacer primero",
+        text: `Priorizar <strong>${fmt(s.despachados)}</strong> items con envio o seguimiento y <strong>${fmt(s.gestionManual)}</strong> pedidos de gestion manual para reembolso o contacto operativo.`
+      }
+    ].map((item) => `
+      <article class="story-card">
+        <h3>${item.title}</h3>
+        <p>${item.text}</p>
+      </article>
+    `).join("");
   }
 
   function renderHealth() {
@@ -221,14 +247,14 @@
   function renderSummaryKpis() {
     const s = state.summary;
     $("#summaryKpis").innerHTML = [
-      kpi("Pedidos con error", fmt(valueOr(s.pedidosError, cfg.expectedTotals.pedidosError)), s.pedidosError ? "Cargados desde la base" : "Referencia esperada", "red"),
-      kpi("Gestion manual", fmt(s.gestionManual), "MercadoPago Pro + GoCuotas", "orange"),
-      kpi("Gestion automatica", fmt(s.gestionAutomatica), "Resto de medios de pago", "green"),
-      kpi("Items PIM", fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems)), s.pedidosPimItems ? `${fmt(s.pedidosPimUnicos)} pedidos unicos` : "Referencia esperada", "blue"),
-      kpi("Unidades rechazadas", fmt(s.unidadesRechazadas), "Lineas VTEX cruzadas con pedidos error", "orange"),
-      kpi("SKUs afectados", fmt(s.skusErrorUnicos), "SKU unicos en pedidos error", "orange"),
+      kpi("Pedidos con error", fmt(valueOr(s.pedidosError, cfg.expectedTotals.pedidosError)), "Pedidos que no avanzaron por stock/precio", "red"),
+      kpi("Unidades rechazadas", fmt(s.unidadesRechazadas), "Unidades dentro de esos pedidos", "orange"),
+      kpi("SKUs afectados", fmt(s.skusErrorUnicos), "Productos distintos involucrados", "orange"),
+      kpi("Gestion manual", fmt(s.gestionManual), "Requieren accion humana", "orange"),
+      kpi("Gestion automatica", fmt(s.gestionAutomatica), "Se reprocesan o cancelan por sistema", "green"),
+      kpi("Pedidos PIM", fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), `${fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems))} items ingresados`, "blue"),
       kpi("Items a dar de baja", fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems)), s.bajaItems ? `${fmt(s.bajaPedidos)} pedidos unicos` : "Referencia esperada", "orange"),
-      kpi("Despachados", fmt(s.despachados), "Accion logistica prioritaria", s.despachados ? "red" : "purple")
+      kpi("Items despachados", fmt(s.despachados), "No se pueden dar de baja sin accion logistica", s.despachados ? "red" : "purple")
     ].join("");
   }
 
@@ -240,13 +266,23 @@
       kpi("Valor facturado", fmtMoney(f.valorFacturado), "Pedidos facturados", "green"),
       kpi("Importe cobrado error", fmtMoney(f.importeCobradoError), "Base dar de baja", "orange"),
       kpi("Diferencia vs correcto", fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto))), "Precio correcto - pagado", "red"),
-      kpi("Ticket prom. actual", fmtMoney(f.ticketPromedioActual), "Referencia analisis", "blue"),
-      kpi("Ticket prom. error", fmtMoney(f.ticketPromedioError), "Monto rechazado / pedidos error", "purple"),
+      kpi("Ticket normal ref.", fmtMoney(f.ticketPromedioActual), "Ticket promedio habitual usado como referencia", "blue"),
+      kpi("Ticket del incidente", fmtMoney(f.ticketPromedioError), "Monto rechazado / pedidos con error", "purple"),
       kpi("Brecha de error", fmtMoney(f.brechaTicket), "Actual - error", "red"),
       kpi("Potencial perdida", fmtMoney(f.potencialPerdida), "Brecha x pedidos error", "red"),
       kpi("Precio prom. correcto", fmtMoney(f.precioPromedioCorrectoBaja), "Items de baja", "orange"),
       kpi("Precio prom. pagado", fmtMoney(f.precioPromedioPagadoBaja), "Items de baja", "red")
     ].join("");
+  }
+
+  function renderFinancialExplanation() {
+    const f = state.financialImpact || {};
+    $("#financialExplanation").innerHTML = `
+      <strong>Lectura financiera:</strong>
+      los pedidos afectados representan ${fmtMoney(f.montoRechazado)} de venta rechazada.
+      El ticket del incidente fue de ${fmtMoney(f.ticketPromedioError)}, contra un ticket normal de referencia de ${fmtMoney(f.ticketPromedioActual)}.
+      Esa brecha explica un potencial de perdida estimado de ${fmtMoney(f.potencialPerdida)}.
+      En paralelo, los pedidos a dar de baja ya tienen una diferencia confirmada de ${fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto)))}.`;
   }
 
   function renderPaymentBreakdown() {

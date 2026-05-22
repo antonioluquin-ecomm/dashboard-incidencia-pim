@@ -70,6 +70,8 @@
     $$("[data-filter-table]").forEach((btn) => {
       btn.addEventListener("click", () => { handleFilterButton(btn); pushHash(); });
     });
+    $("#exportErroresBtn").addEventListener("click", exportErrores);
+    $("#exportBajasBtn").addEventListener("click", exportBajas);
   }
 
   async function loadData(options = {}) {
@@ -646,6 +648,58 @@
 
   function pageButton(label, page, disabled, active) {
     return `<button class="page-btn ${active ? "active" : ""}" type="button" ${disabled ? "disabled" : ""} data-page="${page}">${label}</button>`;
+  }
+
+  function exportCsv(rows, filename, columns) {
+    const lines = [
+      columns.map((c) => c.label),
+      ...rows.map((row) => columns.map((c) => {
+        const val = row[c.key] != null ? row[c.key] : "";
+        const str = String(val);
+        return str.includes(",") || str.includes('"') || str.includes("\n")
+          ? '"' + str.replace(/"/g, '""') + '"'
+          : str;
+      }))
+    ];
+    const csv = "﻿" + lines.map((l) => l.join(",")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function exportErrores() {
+    if (!state.pedidosErrorUnlocked) return;
+    const rows = applyFilter(state.pedidosError || [], state.filters.errores);
+    const date = new Date().toISOString().slice(0, 10);
+    exportCsv(rows, `pedidos-error-${date}.csv`, [
+      { label: "Fecha alta",       key: "fecha_alta" },
+      { label: "Nro pedido",       key: "nro_pedido_canal" },
+      { label: "Medio de pago",    key: "tipo_pago" },
+      { label: "Hora real",        key: "hora_real" },
+      { label: "Gestion",          key: "tipo_gestion" },
+      { label: "Sitio",            key: "sitio" },
+      { label: "Unidades",         key: "unidades" },
+      { label: "Monto",            key: "monto" }
+    ]);
+  }
+
+  function exportBajas() {
+    const rows = applyBajaFilter(state.bajasPrioritarias || [], state.filters.bajas);
+    const date = new Date().toISOString().slice(0, 10);
+    exportCsv(rows, `bajas-prioritarias-${date}.csv`, [
+      { label: "Nro pedido",       key: "nro_pedido_canal" },
+      { label: "SKU",              key: "sku" },
+      { label: "Producto",         key: "producto" },
+      { label: "Cantidad",         key: "cantidad" },
+      { label: "Importe pagado",   key: "importe_pagado" },
+      { label: "Precio correcto",  key: "precio_actual" },
+      { label: "Diferencia",       key: "diff" },
+      { label: "Estado PIM",       key: "estado_pim" },
+      { label: "Tipo baja",        key: "tipo_baja" },
+      { label: "Prioridad",        key: "prioridad" }
+    ]);
   }
 
   function pushHash() {

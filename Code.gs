@@ -2,6 +2,7 @@ const CACHE_KEY = "pim_incident_dashboard_v3";
 const CACHE_TTL_SECONDS = 300;
 const HIGH_DIFF_THRESHOLD = 100000;
 const SKU_IMPACT_LIMIT = 120;
+const BAJAS_PRIORITARIAS_LIMIT = 500;
 const REFERENCE_TICKET_ACTUAL = 135000;
 
 const SHEETS = {
@@ -497,7 +498,7 @@ function buildBajasPrioritariasFromPim_(rows) {
   }).sort(function(a, b) {
     var order = { Urgente: 0, Alta: 1, Media: 2, Baja: 3 };
     return order[a.prioridad] - order[b.prioridad] || Math.abs(b.diff) - Math.abs(a.diff);
-  });
+  }).slice(0, BAJAS_PRIORITARIAS_LIMIT);
 }
 
 function buildCronologia_(rows) {

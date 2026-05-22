@@ -308,6 +308,10 @@
     const f = state.financialImpact || {};
     $("#executiveStory").innerHTML = [
       {
+        title: "Causa raiz",
+        text: `Credenciales de API de <strong>produccion</strong> quedaron en ambiente QA durante el desarrollo del proyecto de multidepositos. Al tocar precio y stock no se cambiaron las credenciales por las de dev, enviando datos ficticios. El error impacto en <strong>Sporting y Woker</strong>. Ya fue corregido y se envio un push de actualizacion sobre los productos afectados.`
+      },
+      {
         title: "Que paso",
         text: `El universo revisado combina <strong>${fmt(s.pedidosError)}</strong> pedidos que cayeron en error PIM y <strong>${fmt(s.pedidosPimUnicos)}</strong> pedidos que si ingresaron a PIM. En total son <strong>${fmt(s.pedidosTotalesIncidente)}</strong> pedidos bajo analisis.`
       },
@@ -318,6 +322,10 @@
       {
         title: "Que hacer primero",
         text: `Priorizar los <strong>${fmt(s.facturadosConDiferenciaPedidos)}</strong> pedidos facturados con diferencia y los <strong>${fmt(s.gestionManual)}</strong> pedidos de error que requieren gestion manual.`
+      },
+      {
+        title: "Acciones tomadas",
+        text: `Cancelacion automatica masiva enviada a VTEX el 22-05. Pedidos de <strong>MercadoPago y GoCuotas</strong> excluidos de la automatizacion — se gestionan con reembolso manual via servicio al cliente. Depositos 01, 17 y 45 apagados y luego reactivados al confirmar normalizacion.`
       }
     ].map((item) => `
       <article class="story-card">
@@ -1101,10 +1109,24 @@
 
   function defaultTimeline() {
     return [
-      { hora: "13:30", titulo: "Deteccion de precios incorrectos", descripcion: "Se detectaron publicaciones con precios por debajo de lo esperado y variantes con stock historico." },
-      { hora: "15:40", titulo: "Pulso de stock y precio", descripcion: "Se envio actualizacion para depositos involucrados. Tiempo estimado de impacto: 6 horas." },
-      { hora: "16:00", titulo: "Pico critico", descripcion: "La mayor concentracion de pedidos con error se observa alrededor de la hora 16." },
-      { hora: "17:50", titulo: "Apagado de deposito afectado", descripcion: "Se apago el deposito 45 en ambas tiendas para contener la incidencia." }
+      { hora: "21-05 · 13:30", titulo: "Deteccion de precios incorrectos", descripcion: "Se detectaron productos ofreciendo precios por debajo de lo normal. Prueba de compra confirmo que algunos no permitían finalizar la compra. Se detecto stock fantasma: articulos viejos levantando stock y precio historico inicial." },
+      { hora: "21-05 · 13:30", titulo: "Inicio de pausa manual de publicaciones", descripcion: "Se comenzaron a pausar manualmente las publicaciones donde se detectaban precios inusuales." },
+      { hora: "21-05 · 13:50", titulo: "Alerta a equipos de soporte", descripcion: "Se informo a los equipos de soporte de PIM e Infracommerce. Se compartieron productos de ejemplo y referencias visuales para evaluar la problematica." },
+      { hora: "21-05 · 14:00", titulo: "Nueva problematica detectada", descripcion: "Se detecto que ciertas variantes de talles levantaban stock y precios incorrectos. Esto complejizo la identificacion de productos afectados. Se continuo pausando publicaciones y realizando revision mas exhaustiva." },
+      { hora: "21-05 · 15:00", titulo: "Relacion con stock fantasma de depositos 01 y 17", descripcion: "Se detecto relacion con depositos 01 y 17 de Sporting. Articulos activos pasaron de 4507 a 4713 (+206) en pocas horas. Se apagaron depositos 01 y 17 tambien para Woker." },
+      { hora: "21-05 · 15:30", titulo: "Deposito 45 comprometido", descripcion: "Se detecto que el deposito 45 tambien estaba enviando informacion incorrecta para ciertos articulos." },
+      { hora: "21-05 · 15:40", titulo: "Pulso de stock y precio", descripcion: "Se envio actualizacion para depositos involucrados. Tiempo estimado de impacto: 6 horas." },
+      { hora: "21-05 · 15:45", titulo: "Escalado a B2B", descripcion: "Se detecto que la problematica tambien escalo al canal B2B." },
+      { hora: "21-05 · 17:50", titulo: "Apagado deposito 45", descripcion: "Se apago el deposito 45 en ambas tiendas (Sporting y Woker) para contener la incidencia." },
+      { hora: "21-05 · 19:00", titulo: "Notificacion a sucursales y automatizacion PIM", descripcion: "Se notifico a sucursales para no despachar. Agentes PIM crearon automatizacion masiva para cancelar pedidos con error en PIM, evitando trabajo manual. La automatizacion cancela en VTEX y VTEX genera reembolso en PayWay." },
+      { hora: "22-05 · 08:30", titulo: "Pulso de cancelacion automatica hacia VTEX", descripcion: "Se envio el pulso de cancelacion. Se excluyeron pedidos abonados con MercadoPago y GoCuotas, que requieren gestion manual." },
+      { hora: "22-05 · 09:30", titulo: "Inicio reembolsos manuales MP y GoCuotas", descripcion: "Se paso el archivo con pedidos de error de MercadoPago y GoCuotas a la jefa de servicio al cliente para comenzar el proceso de reembolso manual." },
+      { hora: "22-05 · 10:00", titulo: "Reunion con PIM", descripcion: "Reunion para aclarar el error, definir causa raiz y acordar proximos pasos." },
+      { hora: "22-05 · 10:50", titulo: "Normalizacion B2B completada", descripcion: "Termino de impactar el push para B2B, normalizando precio y stock en ese canal." },
+      { hora: "22-05 · 11:30", titulo: "Reactivacion deposito 45", descripcion: "Se activo nuevamente el deposito 45 una vez confirmada la normalizacion de datos." },
+      { hora: "22-05 · 12:30", titulo: "Automatizacion de cancelacion completada", descripcion: "Termino de correr la automatizacion de cancelacion de pedidos con error hacia VTEX." },
+      { hora: "22-05 · 13:00", titulo: "Baja manual de pedidos activos en PIM", descripcion: "Se avanzo con la baja de pedidos que ingresaron a PIM pero tenian items con diferencia de precios y aun no estaban despachados. Se realizo de forma manual desde PIM." },
+      { hora: "22-05 · 13:45", titulo: "Reactivacion depositos 17 y 01", descripcion: "Se reactivaron los depositos 17 y 01 confirmando la normalizacion completa del incidente." }
     ];
   }
 

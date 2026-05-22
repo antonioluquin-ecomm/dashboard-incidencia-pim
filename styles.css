@@ -516,6 +516,97 @@ h1 {
   margin-bottom: 14px;
 }
 
+.unlock-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(85,167,255,.28);
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(85,167,255,.10), rgba(245,165,36,.06));
+}
+
+.unlock-panel h3 {
+  margin: 3px 0 5px;
+  font-size: 17px;
+}
+
+.unlock-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.unlock-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.password-input {
+  width: min(240px, 100%);
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+
+.password-input:focus {
+  border-color: rgba(85,167,255,.6);
+}
+
+.primary-btn {
+  min-height: 38px;
+  border: 1px solid rgba(245,165,36,.55);
+  border-radius: 6px;
+  background: rgba(245,165,36,.16);
+  color: var(--orange);
+  cursor: pointer;
+  font-weight: 850;
+  padding: 0 14px;
+}
+
+.primary-btn:hover {
+  border-color: rgba(245,165,36,.85);
+  color: var(--text);
+}
+
+.primary-btn:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.unlock-status {
+  min-width: 132px;
+  color: var(--muted);
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 12px;
+}
+
+.unlock-status.ok {
+  color: var(--green);
+}
+
+.unlock-status.error {
+  color: var(--red);
+}
+
+.toolbar.locked {
+  opacity: .55;
+}
+
+.toolbar.locked input,
+.toolbar.locked button {
+  pointer-events: none;
+}
+
 .search-input {
   width: min(420px, 100%);
   height: 38px;

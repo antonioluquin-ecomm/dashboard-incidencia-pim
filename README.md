@@ -27,9 +27,13 @@ Para usar Apps Script:
 El Apps Script tambien acepta algunos nombres alternativos del Excel, como `Pedidos con Error`, `Pedidos PIM`, `Pedidos VTEX`, `Vtex Woker`, `Vtex Sporting` y `Dar de baja`.
 3. Abrir Extensiones > Apps Script.
 4. Pegar el contenido de `Code.gs`.
-5. Implementar como aplicacion web con acceso de lectura.
-6. Copiar la URL de implementacion.
-7. En `config.js`, cambiar:
+5. Configurar la clave para la vista protegida:
+   - Ir a Configuracion del proyecto > Propiedades del script.
+   - Agregar la propiedad `ERROR_TABLE_PASSWORD`.
+   - Guardar como valor la clave que usara el equipo para ver "Pedidos con error".
+6. Implementar como aplicacion web con acceso de lectura.
+7. Copiar la URL de implementacion.
+8. En `config.js`, cambiar:
 
 ```js
 dataMode: "appsScript",
@@ -98,6 +102,23 @@ appScriptUrl: "URL_DE_APPS_SCRIPT"
 - `bajasPrioritarias`: columnas operativas seguras para gestionar bajas.
 
 No se exponen emails, telefonos, documentos, direcciones ni nombres de clientes.
+
+### Vista protegida de pedidos con error
+
+La pestana "Pedidos con error" pide una clave antes de mostrar detalle. La clave no debe guardarse en el HTML ni en `config.js`; se valida en Apps Script con `ERROR_TABLE_PASSWORD`.
+
+El endpoint protegido devuelve solo:
+
+- `fecha_alta`
+- `nro_pedido_canal`
+- `tipo_pago`
+- `hora_real`
+- `tipo_gestion`
+- `sitio`
+- `unidades`
+- `monto`
+
+Aunque alguien inspeccione el dashboard, no podra recuperar datos personales desde esta vista.
 
 ## Hojas opcionales
 

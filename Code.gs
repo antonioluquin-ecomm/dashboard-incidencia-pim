@@ -25,6 +25,10 @@ const MANUAL_PAYMENT_METHODS = ["mercado_pago_pro", "gocuotas"];
 
 function doGet(e) {
   try {
+    if (e && e.parameter && e.parameter.view === "pedidos_error") {
+      return json_(buildProtectedPedidosError_(e.parameter.password || ""));
+    }
+
     var shouldRefresh = e && e.parameter && e.parameter.refresh === "1";
     var cache = CacheService.getScriptCache();
 
@@ -52,6 +56,46 @@ function doGet(e) {
       error: error.message
     });
   }
+}
+
+function buildProtectedPedidosError_(password) {
+  var expectedPassword = PropertiesService.getScriptProperties().getProperty("ERROR_TABLE_PASSWORD");
+  if (!expectedPassword) {
+    return {
+      error: "ERROR_TABLE_PASSWORD no esta configurada en Propiedades del script."
+    };
+  }
+  if (String(password || "") !== expectedPassword) {
+    return {
+      error: "Contrasena incorrecta."
+    };
+  }
+
+  var pedidosError = readSheet_(SHEETS.pedidosError, REQUIRED_COLUMNS.pedidosError);
+  var pedidosVtex = readSheet_(SHEETS.pedidosVtex, REQUIRED_COLUMNS.pedidosVtex);
+  var pedidosVtexError = filterVtexByPedidosError_(pedidosVtex.rows, pedidosError.rows);
+  var vtexByOrder = buildVtexMetaByOrder_(pedidosVtexError);
+
+  return {
+    updatedAt: new Date().toISOString(),
+    pedidosErrorDetalle: pedidosError.rows.map(function(row) {
+      var order = getAny_(row, ["nro_pedido_canal", "Order", "Nro Pedido"]);
+      var core = getOrderCore_(order);
+      var meta = vtexByOrder[core] || {};
+      var payment = getAny_(row, ["tipo_pago", "Payment System Name", "Medio de Pago"]);
+
+      return {
+        fecha_alta: getAny_(row, ["fecha_alta", "Fecha Alta", "fecha_alta.1"]),
+        nro_pedido_canal: order,
+        tipo_pago: payment,
+        hora_real: getRealHour_(row),
+        tipo_gestion: MANUAL_PAYMENT_METHODS.indexOf(normalizeText_(payment)) >= 0 ? "Manual" : "Automatica",
+        sitio: meta.sitio || "",
+        unidades: meta.unidades || 0,
+        monto: meta.monto || 0
+      };
+    })
+  };
 }
 
 function buildPayload_() {
@@ -253,6 +297,28 @@ function buildAmountByOrder_(rows) {
     totals[core] = (totals[core] || 0) + toNumber_(getAny_(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
   });
   return totals;
+}
+
+function buildVtexMetaByOrder_(rows) {
+  var meta = {};
+  rows.forEach(function(row) {
+    var core = getOrderCore_(getAny_(row, ["Order", "Nro Pedido", "nro_pedido_canal"]));
+    if (!core) return;
+    if (!meta[core]) {
+      meta[core] = {
+        sitio: "",
+        sitios: {},
+        unidades: 0,
+        monto: 0
+      };
+    }
+    var sitio = normalizeStore_(getAny_(row, ["Seller Name", "Tienda", "Host"]));
+    if (sitio) meta[core].sitios[sitio] = true;
+    meta[core].sitio = Object.keys(meta[core].sitios).join(", ");
+    meta[core].unidades += toNumber_(getAny_(row, ["Quantity_SKU", "Cantidad", "cantidad"])) || 1;
+    meta[core].monto += toNumber_(getAny_(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
+  });
+  return meta;
 }
 
 function buildSkuImpactFromVtex_(rows, limit) {

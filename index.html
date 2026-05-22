@@ -105,10 +105,23 @@
           <p class="eyebrow">Pedidos rechazados</p>
           <h2>Pedidos con error</h2>
         </div>
-        <p class="section-note">Base orientada a pedidos que no ingresaron a PIM. En modo seguro, esta vista prioriza agregados y evita exponer datos personales.</p>
+        <p class="section-note">Vista operativa protegida. Muestra solo datos necesarios para validar el incidente, sin clientes, emails, telefonos ni direcciones.</p>
       </div>
 
-      <div class="toolbar">
+      <div class="unlock-panel" id="errorsUnlockPanel">
+        <div>
+          <p class="eyebrow">Acceso protegido</p>
+          <h3>Desbloquear detalle saneado</h3>
+          <p>Ingresar la clave operativa para ver los pedidos con error. La API solo entrega campos seguros.</p>
+        </div>
+        <div class="unlock-actions">
+          <input class="password-input" id="errorPassword" type="password" autocomplete="current-password" placeholder="Clave de acceso">
+          <button class="primary-btn" id="unlockErrorsButton" type="button">Ver pedidos</button>
+          <span class="unlock-status" id="errorUnlockStatus">Detalle bloqueado</span>
+        </div>
+      </div>
+
+      <div class="toolbar locked" id="errorsToolbar">
         <input class="search-input" id="searchErrores" type="search" placeholder="Buscar pedido, medio de pago o fecha">
         <button class="filter-btn" type="button" data-filter-table="errores" data-filter-field="tipo_pago" data-filter-value="mercado_pago_pro">MercadoPago Pro</button>
         <button class="filter-btn" type="button" data-filter-table="errores" data-filter-field="tipo_pago" data-filter-value="modo">MODO</button>
@@ -124,7 +137,10 @@
               <th>Nro pedido canal</th>
               <th>Medio de pago</th>
               <th>Hora real</th>
-              <th>Gestion sugerida</th>
+              <th>Gestion</th>
+              <th>Sitio</th>
+              <th>Unidades</th>
+              <th>Monto</th>
             </tr>
           </thead>
           <tbody id="tbodyErrores"></tbody>

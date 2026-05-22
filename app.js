@@ -14,6 +14,7 @@
     bajasPrioritarias: [],
     cronologia: [],
     pedidosError: [],
+    pedidosErrorUnlocked: false,
     filters: {
       errores: { search: "", field: null, value: null, page: 1, perPage: 50 },
       bajas: { search: "", dispatchOnly: false, page: 1, perPage: 25 }
@@ -32,6 +33,10 @@
     $("#refreshButton").addEventListener("click", () => loadData({ refresh: true }));
     $$(".nav-tab").forEach((btn) => {
       btn.addEventListener("click", () => showTab(btn.dataset.tab));
+    });
+    $("#unlockErrorsButton").addEventListener("click", unlockPedidosError);
+    $("#errorPassword").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") unlockPedidosError();
     });
     $("#searchErrores").addEventListener("input", (event) => {
       state.filters.errores.search = event.target.value.trim().toLowerCase();
@@ -114,6 +119,53 @@
     };
   }
 
+  async function unlockPedidosError() {
+    const passwordInput = $("#errorPassword");
+    const status = $("#errorUnlockStatus");
+    const password = passwordInput.value;
+
+    if (!cfg.appScriptUrl) {
+      status.textContent = "Falta configurar Apps Script";
+      status.className = "unlock-status error";
+      return;
+    }
+    if (!password) {
+      status.textContent = "Ingresar clave";
+      status.className = "unlock-status error";
+      passwordInput.focus();
+      return;
+    }
+
+    $("#unlockErrorsButton").disabled = true;
+    status.textContent = "Validando...";
+    status.className = "unlock-status";
+
+    try {
+      const url = cfg.appScriptUrl + cacheBust(cfg.appScriptUrl)
+        + "&view=pedidos_error&password=" + encodeURIComponent(password);
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const payload = await response.json();
+      if (payload.error) throw new Error(payload.error);
+
+      state.pedidosError = normalizeRows(payload.pedidosErrorDetalle || []);
+      state.pedidosErrorUnlocked = true;
+      state.filters.errores.page = 1;
+      passwordInput.value = "";
+      status.textContent = `${fmt(state.pedidosError.length)} pedidos visibles`;
+      status.className = "unlock-status ok";
+      renderPedidosError();
+    } catch (error) {
+      state.pedidosErrorUnlocked = false;
+      state.pedidosError = [];
+      status.textContent = error.message;
+      status.className = "unlock-status error";
+      renderPedidosError();
+    } finally {
+      $("#unlockErrorsButton").disabled = false;
+    }
+  }
+
   function applyPayload(payload) {
     state.summary = payload.summary || {};
     state.health = payload.health || null;
@@ -126,6 +178,7 @@
     state.bajasPrioritarias = payload.bajasPrioritarias || [];
     state.cronologia = payload.cronologia || [];
     state.pedidosError = payload.pedidosError || [];
+    state.pedidosErrorUnlocked = Boolean(state.pedidosError.length);
   }
 
   function normalizeLegacyPayload(payload) {
@@ -358,11 +411,16 @@
     const filter = state.filters.errores;
     const rows = applyFilter(state.pedidosError || [], filter);
     const page = paginate(rows, filter);
+    const unlocked = state.pedidosErrorUnlocked;
 
-    $("#countErrores").textContent = rows.length ? `${fmt(rows.length)} pedidos` : `${fmt(state.summary.pedidosError || 0)} pedidos`;
+    $("#errorsToolbar").classList.toggle("locked", !unlocked);
+    $("#countErrores").textContent = unlocked
+      ? `${fmt(rows.length)} pedidos`
+      : `${fmt(state.summary.pedidosError || 0)} pedidos protegidos`;
     $("#tbodyErrores").innerHTML = page.length ? page.map((row) => {
       const payment = getPayment(row);
-      const manual = manualPayments.has(normalizeText(payment));
+      const gestion = getValue(row, ["tipo_gestion", "Gestion", "Gestion sugerida"]);
+      const manual = normalizeText(gestion) === "manual" || manualPayments.has(normalizeText(payment));
       return `
         <tr>
           <td class="td-mono">${escapeHtml(getValue(row, ["fecha_alta", "Fecha Alta", "fecha_alta.1"]).slice(0, 19))}</td>
@@ -370,10 +428,15 @@
           <td><span class="badge ${manual ? "badge-orange" : "badge-blue"}">${escapeHtml(payment || "Sin dato")}</span></td>
           <td class="td-mono">${formatHour(getRealHour(row))}</td>
           <td><span class="badge ${manual ? "badge-orange" : "badge-green"}">${manual ? "Manual" : "Automatica"}</span></td>
+          <td>${escapeHtml(getValue(row, ["sitio", "Tienda", "Seller Name"]) || "Sin dato")}</td>
+          <td class="td-right td-mono">${fmt(toNumber(getValue(row, ["unidades", "Cantidad", "Quantity_SKU"])))}</td>
+          <td class="td-right td-mono">${fmtMoney(toNumber(getValue(row, ["monto", "Monto", "SKU Total Price"])))}</td>
         </tr>`;
-    }).join("") : emptyRow(5, "La API segura no expone filas completas de pedidos con error. Usar los agregados del resumen.");
+    }).join("") : emptyRow(8, unlocked
+      ? "No hay pedidos para el filtro aplicado."
+      : "Detalle bloqueado. Ingresar la clave para ver la tabla saneada de pedidos con error.");
 
-    renderPager("#pagerErrores", rows.length, filter, renderPedidosError);
+    renderPager("#pagerErrores", unlocked ? rows.length : 0, filter, renderPedidosError);
   }
 
   function renderTimeline() {

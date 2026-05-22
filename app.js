@@ -49,7 +49,7 @@
   function bindUi() {
     $("#refreshButton").addEventListener("click", () => loadData({ refresh: true }));
     $$(".nav-tab").forEach((btn) => {
-      btn.addEventListener("click", () => showTab(btn.dataset.tab));
+      btn.addEventListener("click", () => { showTab(btn.dataset.tab); pushHash(); });
     });
     $("#unlockErrorsButton").addEventListener("click", unlockPedidosError);
     $("#errorPassword").addEventListener("keydown", (event) => {
@@ -59,14 +59,16 @@
       state.filters.errores.search = event.target.value.trim().toLowerCase();
       state.filters.errores.page = 1;
       renderPedidosError();
+      pushHash();
     });
     $("#searchBajas").addEventListener("input", (event) => {
       state.filters.bajas.search = event.target.value.trim().toLowerCase();
       state.filters.bajas.page = 1;
       renderBajas();
+      pushHash();
     });
     $$("[data-filter-table]").forEach((btn) => {
-      btn.addEventListener("click", () => handleFilterButton(btn));
+      btn.addEventListener("click", () => { handleFilterButton(btn); pushHash(); });
     });
   }
 
@@ -84,6 +86,7 @@
       $("#sourceStatus").className = "status-pill ok";
       $("#lastUpdate").textContent = new Date().toLocaleString("es-AR");
       renderAll();
+      readHash();
     } catch (error) {
       $("#sourceStatus").textContent = "Sin conexion";
       $("#sourceStatus").className = "status-pill error";
@@ -643,6 +646,40 @@
 
   function pageButton(label, page, disabled, active) {
     return `<button class="page-btn ${active ? "active" : ""}" type="button" ${disabled ? "disabled" : ""} data-page="${page}">${label}</button>`;
+  }
+
+  function pushHash() {
+    const params = new URLSearchParams();
+    const activeTabEl = document.querySelector(".nav-tab.active");
+    if (activeTabEl && activeTabEl.dataset.tab) params.set("tab", activeTabEl.dataset.tab);
+    const ef = state.filters.errores;
+    if (ef.search)       params.set("es", ef.search);
+    if (ef.field)        params.set("ef", ef.field);
+    if (ef.value)        params.set("ev", ef.value);
+    const bf = state.filters.bajas;
+    if (bf.search)       params.set("bs", bf.search);
+    if (bf.dispatchOnly) params.set("bd", "1");
+    const hash = params.toString();
+    history.replaceState(null, "", hash ? "#" + hash : location.pathname + location.search);
+  }
+
+  function readHash() {
+    if (!location.hash) return;
+    const params = new URLSearchParams(location.hash.slice(1));
+    if (params.has("tab")) showTab(params.get("tab"));
+    const ef = state.filters.errores;
+    if (params.has("es")) { ef.search = params.get("es"); const el = $("#searchErrores"); if (el) el.value = ef.search; }
+    if (params.has("ef")) ef.field = params.get("ef");
+    if (params.has("ev")) ef.value = params.get("ev");
+    const bf = state.filters.bajas;
+    if (params.has("bs")) { bf.search = params.get("bs"); const el = $("#searchBajas"); if (el) el.value = bf.search; }
+    if (params.has("bd")) bf.dispatchOnly = true;
+    $$("[data-filter-table='bajas']").forEach((btn) => {
+      if (btn.dataset.filterDispatch) btn.classList.toggle("active", bf.dispatchOnly);
+      else if (btn.dataset.filterField) btn.classList.toggle("active", bf.field === btn.dataset.filterField && bf.value === btn.dataset.filterValue);
+    });
+    renderPedidosError();
+    renderBajas();
   }
 
   function showTab(tab) {

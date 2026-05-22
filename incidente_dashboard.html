@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incidente 21/05/2026 — Reporte de Precio & Stock</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0e14;
+  --surface: #13161f;
+  --surface2: #1a1e2a;
+  --border: rgba(255,255,255,0.07);
+  --red: #e74c3c;
+  --red-dim: rgba(231,76,60,0.12);
+  --orange: #f39c12;
+  --orange-dim: rgba(243,156,18,0.12);
+  --green: #27ae60;
+  --green-dim: rgba(39,174,96,0.12);
+  --blue: #3498db;
+  --blue-dim: rgba(52,152,219,0.12);
+  --purple: #9b59b6;
+  --purple-dim: rgba(155,89,182,0.12);
+  --teal: #1abc9c;
+  --teal-dim: rgba(26,188,156,0.12);
+  --text: #e8eaf0;
+  --text-dim: #7a8194;
+  --text-muted: #454c63;
+  --accent: #f39c12;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* HEADER */
+.site-header {
+  border-bottom: 1px solid var(--border);
+  padding: 20px 40px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(12,14,20,0.95);
+  backdrop-filter: blur(12px);
+}
+.site-header h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: 17px; font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.badge-incident {
+  background: var(--red); color: #fff;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; padding: 3px 10px; border-radius: 3px;
+  letter-spacing: 1px; text-transform: uppercase;
+  animation: pulse-red 2s ease-in-out infinite;
+}
+@keyframes pulse-red {
+  0%,100% { opacity:1; } 50% { opacity:.6; }
+}
+.last-update {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--text-dim);
+}
+
+/* NAV TABS */
+.nav-tabs {
+  display: flex; gap: 2px;
+  padding: 0 40px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.nav-tab {
+  padding: 14px 22px;
+  font-size: 13px; font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all .2s;
+  white-space: nowrap;
+  background: none; border-top: none; border-left: none; border-right: none;
+  font-family: 'DM Sans', sans-serif;
+}
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* MAIN */
+.main { padding: 36px 40px; max-width: 1400px; margin: 0 auto; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeIn .3s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+/* SECTION TITLES */
+.section-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 22px; font-weight: 800;
+  margin-bottom: 24px;
+  display: flex; align-items: center; gap: 12px;
+}
+.section-title span { color: var(--text-dim); font-size: 14px; font-weight: 400; font-family: 'DM Sans', sans-serif; }
+.sub-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; font-weight: 500;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 16px; margin-top: 32px;
+}
+
+/* KPI GRID */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  position: relative; overflow: hidden;
+  transition: transform .2s, border-color .2s;
+}
+.kpi-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.14); }
+.kpi-card::before {
+  content: ''; position: absolute; top:0; left:0; right:0; height:2px;
+  background: var(--accent-color, var(--accent));
+}
+.kpi-card.red { --accent-color: var(--red); background: linear-gradient(135deg, var(--red-dim), var(--surface)); }
+.kpi-card.orange { --accent-color: var(--orange); background: linear-gradient(135deg, var(--orange-dim), var(--surface)); }
+.kpi-card.green { --accent-color: var(--green); background: linear-gradient(135deg, var(--green-dim), var(--surface)); }
+.kpi-card.blue { --accent-color: var(--blue); background: linear-gradient(135deg, var(--blue-dim), var(--surface)); }
+.kpi-card.purple { --accent-color: var(--purple); background: linear-gradient(135deg, var(--purple-dim), var(--surface)); }
+.kpi-label { font-size: 11px; color: var(--text-dim); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.kpi-value {
+  font-family: 'Syne', sans-serif;
+  font-size: 28px; font-weight: 800;
+  line-height: 1;
+}
+.kpi-sub { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+
+/* LOADING OVERLAY */
+.loading-overlay {
+  position: fixed; inset:0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999; flex-direction: column; gap: 16px;
+}
+.loading-spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--orange);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-dim); }
+
+/* ERROR BANNER */
+.error-banner {
+  background: var(--red-dim); border: 1px solid var(--red);
+  border-radius: 8px; padding: 16px 20px;
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  color: var(--red); margin-bottom: 24px;
+  display: none;
+}
+
+/* DATA TABLES */
+.table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  background: var(--surface2);
+  padding: 12px 16px;
+  text-align: left;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--text-dim);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+tbody tr:hover { background: rgba(255,255,255,0.03); }
+tbody tr:last-child { border-bottom: none; }
+tbody td { padding: 11px 16px; font-size: 13px; }
+.td-mono { font-family: 'DM Mono', monospace; font-size: 11px; }
+.td-right { text-align: right; }
+.td-center { text-align: center; }
+
+/* BADGES */
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 20px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+  text-transform: uppercase; white-space: nowrap;
+}
+.badge-red { background: var(--red-dim); color: var(--red); border: 1px solid rgba(231,76,60,.3); }
+.badge-orange { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(243,156,18,.3); }
+.badge-green { background: var(--green-dim); color: var(--green); border: 1px solid rgba(39,174,96,.3); }
+.badge-blue { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(52,152,219,.3); }
+.badge-purple { background: var(--purple-dim); color: var(--purple); border: 1px solid rgba(155,89,182,.3); }
+.badge-gray { background: rgba(255,255,255,.05); color: var(--text-dim); border: 1px solid var(--border); }
+
+/* TWO-COL LAYOUT */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+@media(max-width:900px) { .two-col, .three-col { grid-template-columns: 1fr; } }
+
+/* CARD */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+}
+.card-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 16px;
+}
+
+/* BREAKDOWN TABLE (compact) */
+.breakdown-table { width: 100%; }
+.breakdown-table tr { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.breakdown-table tr:last-child { border-bottom: none; }
+.breakdown-label { flex: 1; font-size: 13px; }
+.breakdown-bar-wrap { width: 100px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 12px; }
+.breakdown-bar { height: 4px; border-radius: 2px; background: var(--accent); }
+.breakdown-value { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-dim); width: 80px; text-align: right; }
+
+/* CRONOLOGÍA */
+.timeline { position: relative; }
+.timeline::before {
+  content: ''; position: absolute; left: 110px; top:0; bottom:0;
+  width: 1px; background: var(--border);
+}
+.tl-item {
+  display: flex; gap: 0; margin-bottom: 0;
+  position: relative;
+}
+.tl-time {
+  width: 110px; min-width: 110px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px; color: var(--text-dim);
+  padding: 20px 20px 20px 0;
+  text-align: right; line-height: 1.4;
+}
+.tl-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid var(--surface2);
+  margin: 22px -6px 0 0; flex-shrink: 0;
+  position: relative; z-index: 1;
+}
+.tl-dot.red { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.tl-dot.orange { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+.tl-dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.tl-dot.blue { background: var(--blue); }
+.tl-dot.purple { background: var(--purple); }
+.tl-dot.gray { background: var(--text-muted); }
+.tl-content {
+  flex: 1; padding: 16px 0 16px 28px;
+  border-bottom: 1px solid var(--border);
+}
+.tl-item:last-child .tl-content { border-bottom: none; }
+.tl-event-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.tl-event-desc { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+.tl-tag {
+  display: inline-block; padding: 1px 8px; border-radius: 3px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+  text-transform: uppercase; margin-bottom: 6px;
+}
+.tl-tag.detection { background: var(--orange-dim); color: var(--orange); }
+.tl-tag.action { background: var(--blue-dim); color: var(--blue); }
+.tl-tag.escalation { background: var(--red-dim); color: var(--red); }
+.tl-tag.resolution { background: var(--green-dim); color: var(--green); }
+.tl-tag.pending { background: var(--purple-dim); color: var(--purple); }
+
+/* HORA CHART */
+.hora-chart { margin: 24px 0; }
+.hora-bars { display: flex; align-items: flex-end; gap: 4px; height: 100px; }
+.hora-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.hora-bar {
+  width: 100%; border-radius: 3px 3px 0 0;
+  transition: opacity .2s;
+  cursor: default;
+  position: relative;
+}
+.hora-bar:hover { opacity: .8; }
+.hora-bar[data-peak="true"] { background: var(--red) !important; }
+.hora-label { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--text-dim); white-space: nowrap; }
+.hora-count { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--text-dim); }
+
+/* SEARCH & FILTER */
+.table-controls {
+  display: flex; gap: 12px; margin-bottom: 16px;
+  align-items: center; flex-wrap: wrap;
+}
+.search-input {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px;
+  padding: 8px 14px; font-family: 'DM Sans', sans-serif;
+  font-size: 13px; outline: none;
+  transition: border-color .2s; flex: 1; min-width: 200px;
+}
+.search-input:focus { border-color: var(--accent); }
+.filter-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text-dim); border-radius: 6px;
+  padding: 8px 14px; font-size: 12px; cursor: pointer;
+  transition: all .2s; font-family: 'DM Sans', sans-serif;
+}
+.filter-btn:hover, .filter-btn.active { background: var(--orange-dim); color: var(--orange); border-color: var(--orange); }
+.row-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-dim); margin-left: auto; }
+
+/* PAGINATOR */
+.paginator { display: flex; gap: 8px; margin-top: 16px; align-items: center; justify-content: center; }
+.page-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text-dim); border-radius: 6px; padding: 6px 12px;
+  font-size: 12px; cursor: pointer; transition: all .2s;
+  font-family: 'DM Mono', monospace;
+}
+.page-btn:hover, .page-btn.active { background: var(--orange-dim); color: var(--orange); border-color: var(--orange); }
+.page-btn:disabled { opacity:.3; cursor:not-allowed; }
+
+/* ALERT BOX */
+.alert-box {
+  border-radius: 8px; padding: 16px 20px;
+  display: flex; gap: 14px; align-items: flex-start;
+  margin-bottom: 24px; border: 1px solid;
+}
+.alert-box.urgent { background: var(--red-dim); border-color: rgba(231,76,60,.4); }
+.alert-box.warning { background: var(--orange-dim); border-color: rgba(243,156,18,.4); }
+.alert-box.info { background: var(--blue-dim); border-color: rgba(52,152,219,.4); }
+.alert-icon { font-size: 20px; flex-shrink:0; margin-top:1px; }
+.alert-text { font-size: 13px; line-height: 1.6; }
+.alert-text strong { display: block; margin-bottom: 4px; font-size: 14px; }
+
+/* TOOLTIP */
+[data-tooltip] { position: relative; }
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute; bottom: 110%; left: 50%;
+  transform: translateX(-50%);
+  background: #1a1e2a; border: 1px solid var(--border);
+  padding: 6px 10px; border-radius: 6px;
+  font-size: 11px; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+  z-index: 50;
+}
+[data-tooltip]:hover::after { opacity: 1; }
+
+/* STAT ROW */
+.stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: center; }
+.stat-row:last-child { border-bottom: none; }
+.stat-label { font-size: 13px; color: var(--text-dim); }
+.stat-value { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; }
+
+/* PROGRESS BAR */
+.progress-bar-wrap { height: 6px; background: var(--border); border-radius: 3px; margin-top: 6px; }
+.progress-bar { height: 6px; border-radius: 3px; }
+
+/* SECTION DIVIDER */
+.divider { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Cargando datos desde Google Sheets...</div>
+</div>
+
+<header class="site-header">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <h1>⚠️ Incidente 21–22 / 05 / 2026</h1>
+    <span class="badge-incident">Activo</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:20px;">
+    <span class="last-update" id="lastUpdate">—</span>
+    <button onclick="loadData()" style="background:var(--orange-dim);border:1px solid var(--orange);color:var(--orange);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'DM Mono',monospace;">↻ Actualizar</button>
+  </div>
+</header>
+
+<nav class="nav-tabs">
+  <button class="nav-tab active" onclick="showTab('resumen')">📊 Resumen General</button>
+  <button class="nav-tab" onclick="showTab('errores')">❌ Pedidos con Error</button>
+  <button class="nav-tab" onclick="showTab('cronologia')">⏱️ Cronología</button>
+  <button class="nav-tab" onclick="showTab('sku')">🏷️ Análisis por SKU</button>
+  <button class="nav-tab" onclick="showTab('pim')">✅ PIM & Bajas</button>
+</nav>
+
+<main class="main">
+  <div class="error-banner" id="errorBanner"></div>
+
+  <!-- ========== RESUMEN ========== -->
+  <div class="tab-panel active" id="tab-resumen">
+    <div class="section-title">Resumen General <span>Incidente de precio y stock — 21/05/2026</span></div>
+
+    <div class="alert-box urgent">
+      <span class="alert-icon">🚨</span>
+      <div class="alert-text">
+        <strong>Acción urgente requerida</strong>
+        Hay pedidos a dar de baja que ya tienen envío despachado. Coordinar con logística de forma inmediata para retención de envíos. Los pedidos con MercadoPago Pro y GoCuotas requieren gestión manual de reembolso (620 pedidos).
+      </div>
+    </div>
+
+    <div class="sub-title">Pedidos con error (rechazados)</div>
+    <div class="kpi-grid" id="kpiErrores"></div>
+
+    <div class="sub-title">Pedidos ingresados a PIM</div>
+    <div class="kpi-grid" id="kpiPim"></div>
+
+    <div class="sub-title">Dar de baja</div>
+    <div class="kpi-grid" id="kpiBaja"></div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">Errores por medio de pago</div>
+        <div id="mpTable"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Por tienda — errores</div>
+        <div id="tiendaTable"></div>
+        <div style="margin-top:24px;">
+          <div class="card-title">Estados en PIM</div>
+          <div id="pimEstados"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px;">
+      <div class="card-title">Cronología — pedidos con error por hora (corregidos UTC-3)</div>
+      <div class="hora-chart">
+        <div class="hora-bars" id="horaChart"></div>
+        <div id="horaLabels" style="display:flex;gap:4px;margin-top:8px;padding-left:0;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== ERRORES ========== -->
+  <div class="tab-panel" id="tab-errores">
+    <div class="section-title">Pedidos con Error <span>Stock insuficiente — no ingresaron a PIM</span></div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">Análisis por medio de pago</div>
+        <div id="mpDetalle"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">KPIs</div>
+        <div id="kpiErroresCard"></div>
+        <div style="margin-top:24px;">
+          <div class="card-title">Por tienda</div>
+          <div id="tiendaDetalle"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub-title">Tabla completa de pedidos con error</div>
+    <div class="table-controls">
+      <input class="search-input" id="searchErrores" placeholder="Buscar por pedido, nombre, email, medio de pago..." oninput="filterTable('errores')">
+      <button class="filter-btn" onclick="filterByField('errores','sitio','Sporting')">Sporting</button>
+      <button class="filter-btn" onclick="filterByField('errores','sitio','Woker')">Woker</button>
+      <button class="filter-btn" onclick="filterByField('errores','tipo_gestion','Manual')">Manual</button>
+      <button class="filter-btn" onclick="filterByField('errores','tipo_gestion','Automático')">Automático</button>
+      <button class="filter-btn" onclick="clearFilters('errores')">Limpiar</button>
+      <span class="row-count" id="countErrores"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="tableErrores">
+        <thead><tr>
+          <th>Fecha Alta</th><th>Nro Pedido</th><th>Medio de Pago</th>
+          <th>Tipo Gestión</th><th>Sitio</th><th>Cliente</th><th>Email</th>
+        </tr></thead>
+        <tbody id="tbodyErrores"></tbody>
+      </table>
+    </div>
+    <div class="paginator" id="pagErrores"></div>
+  </div>
+
+  <!-- ========== CRONOLOGÍA ========== -->
+  <div class="tab-panel" id="tab-cronologia">
+    <div class="section-title">Cronología del Incidente <span>21 — 22 de mayo de 2026</span></div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">Resumen temporal</div>
+        <div id="cronKpis"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Pedidos con error por hora (UTC-3)</div>
+        <div class="hora-chart">
+          <div class="hora-bars" id="horaChartCron"></div>
+          <div id="horaLabelsCron" style="display:flex;gap:4px;margin-top:8px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="sub-title">21 de mayo 2026 — Línea de tiempo del incidente</div>
+        <div class="timeline" id="timeline21"></div>
+      </div>
+      <div>
+        <div class="sub-title">22 de mayo 2026 — Acciones y seguimiento</div>
+        <div class="timeline" id="timeline22"></div>
+        <div class="alert-box warning" style="margin-top:24px;">
+          <span class="alert-icon">📝</span>
+          <div class="alert-text">
+            <strong>Cronología del 22/05 pendiente</strong>
+            Los eventos y acciones del 22/05 están siendo relevados. Actualizar este campo cuando estén disponibles.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub-title">Detalle por hora — pedidos con error</div>
+    <div class="table-wrap">
+      <table id="tableHoras">
+        <thead><tr>
+          <th>Hora (UTC-3)</th><th class="td-right">Pedidos</th><th class="td-right">Acumulado</th>
+          <th class="td-right">% del Total</th><th class="td-right">Sporting</th>
+          <th class="td-right">Woker</th><th class="td-right">Automático</th>
+          <th class="td-right">Manual</th><th>Fase</th>
+        </tr></thead>
+        <tbody id="tbodyHoras"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== SKU ========== -->
+  <div class="tab-panel" id="tab-sku">
+    <div class="section-title">Análisis por SKU <span>Pedidos rechazados — impacto por producto</span></div>
+
+    <div class="kpi-grid" id="kpiSku"></div>
+
+    <div class="sub-title">SKUs presentes en ambos sitios (Sporting + Woker)</div>
+    <div class="alert-box info">
+      <span class="alert-icon">ℹ️</span>
+      <div class="alert-text">Estos SKUs generaron errores simultáneamente en ambas plataformas, lo que indica que el problema de stock/precio afectó el catálogo compartido.</div>
+    </div>
+    <div class="table-wrap" style="margin-bottom:32px;">
+      <table id="tableSkuAmbos">
+        <thead><tr>
+          <th>SKU (Ref Code)</th><th>Nombre Producto</th>
+          <th class="td-right">Pedidos</th><th class="td-right">Unidades</th>
+          <th class="td-right">Monto Total</th><th>Sitios</th>
+        </tr></thead>
+        <tbody id="tbodySkuAmbos"></tbody>
+      </table>
+    </div>
+
+    <div class="sub-title">Tabla general de SKUs afectados</div>
+    <div class="table-controls">
+      <input class="search-input" id="searchSku" placeholder="Buscar SKU o producto..." oninput="filterTable('sku')">
+      <button class="filter-btn" onclick="filterByField('sku','sitios','Ambos')">Ambos sitios</button>
+      <button class="filter-btn" onclick="filterByField('sku','sitios','Sporting')">Solo Sporting</button>
+      <button class="filter-btn" onclick="filterByField('sku','sitios','Woker')">Solo Woker</button>
+      <button class="filter-btn" onclick="clearFilters('sku')">Limpiar</button>
+      <span class="row-count" id="countSku"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="tableSku">
+        <thead><tr>
+          <th>SKU (Ref Code)</th><th>Nombre Producto</th>
+          <th>Sitios</th><th class="td-right">Pedidos</th>
+          <th class="td-right">Unidades</th><th class="td-right">Monto Total</th>
+        </tr></thead>
+        <tbody id="tbodySku"></tbody>
+      </table>
+    </div>
+    <div class="paginator" id="pagSku"></div>
+  </div>
+
+  <!-- ========== PIM ========== -->
+  <div class="tab-panel" id="tab-pim">
+    <div class="section-title">PIM & Bajas <span>Pedidos que ingresaron + los que deben darse de baja</span></div>
+
+    <div class="two-col">
+      <div class="kpi-grid" id="kpiPimDetail" style="margin-bottom:0;"></div>
+      <div class="kpi-grid" id="kpiBajaDetail" style="margin-bottom:0;"></div>
+    </div>
+
+    <div class="alert-box urgent" style="margin-top:24px;">
+      <span class="alert-icon">🚨</span>
+      <div class="alert-text">
+        <strong>Pedidos despachados — Acción inmediata</strong>
+        Los ítems marcados en rojo en la tabla de baja ya tienen envío en curso. Contactar con logística para retener los envíos antes de que sean entregados.
+      </div>
+    </div>
+
+    <div class="sub-title">Pedidos a dar de baja (rojo = despachado)</div>
+    <div class="table-wrap" style="margin-bottom:32px;">
+      <table id="tableBaja">
+        <thead><tr>
+          <th>Nro Pedido Canal</th><th>SKU</th><th>Producto</th>
+          <th class="td-right">Cant.</th><th class="td-right">Imp. Pagado</th>
+          <th class="td-right">Precio Correcto</th><th class="td-right">Diff $</th>
+          <th>Estado Envío</th><th>Nro Seguimiento</th>
+        </tr></thead>
+        <tbody id="tbodyBaja"></tbody>
+      </table>
+    </div>
+
+    <div class="sub-title">Tabla completa — pedidos en PIM</div>
+    <div class="table-controls">
+      <input class="search-input" id="searchPim" placeholder="Buscar por pedido, SKU, producto, tienda..." oninput="filterTable('pim')">
+      <button class="filter-btn" onclick="filterByField('pim','Tienda','Sporting')">Sporting</button>
+      <button class="filter-btn" onclick="filterByField('pim','Tienda','Woker')">Woker</button>
+      <button class="filter-btn" onclick="filterByField('pim','en_baja','SI')">En Baja</button>
+      <button class="filter-btn" onclick="filterByField('pim','Estado Actual','Facturado')">Facturado</button>
+      <button class="filter-btn" onclick="clearFilters('pim')">Limpiar</button>
+      <span class="row-count" id="countPim"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="tablePim">
+        <thead><tr>
+          <th>Nro Pedido</th><th>Tienda</th><th>Fecha</th>
+          <th>SKU</th><th>Producto</th><th class="td-right">Cant.</th>
+          <th class="td-right">Precio WEB</th><th class="td-right">Precio PIM</th>
+          <th>Estado</th><th>En Baja</th>
+        </tr></thead>
+        <tbody id="tbodyPim"></tbody>
+      </table>
+    </div>
+    <div class="paginator" id="pagPim"></div>
+  </div>
+
+</main>
+
+<script>
+// ─────────────────────────────────────────
+// GOOGLE SHEETS CSV URL
+// ─────────────────────────────────────────
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRg0yx7VtbM_hKnvETRpa3FgE81WKoxbyD68X19_fx_0G6IpywZ6pC_tVxfaST1GlWHiSzD-zlpotW/pub?output=csv';
+
+// ─────────────────────────────────────────
+// HARDCODED DATA (fallback & computed stats)
+// ─────────────────────────────────────────
+const STATS = {
+  errores: {
+    total: 2266, clientes: 1713,
+    sporting: { pedidos: 1992, unidades: 9359, monto: 83770861 },
+    woker:    { pedidos: 274,  unidades: 1340, monto: 18196794 },
+    skus: 1376, skusAmbos: 41,
+    montoTotal: 101967654, unidades: 10699,
+    automatico: 1646, manual: 620,
+  },
+  pim: {
+    totalItems: 2390, pedidosUnicos: 1394,
+    estados: {
+      'Activo': 995, 'Facturado': 682, 'Asignado': 354,
+      'Cola de Facturación': 212, 'Baja': 21, 'Resuelto (Reembolso)': 4
+    },
+    sporting: 1082, woker: 254,
+    skus: 312, valorTotal: 163681399, valorFacturado: 49844922,
+  },
+  baja: {
+    pedidos: 36, items: 55, skus: 29,
+    despachados: 10, itemsDespachados: 19,
+    importePagado: 1080056, diff: -5317488,
+    precioPromCorrect: 189999, precioPromPagado: 19637,
+  },
+  mediosPago: [
+    { tipo:'modo',             pedidos:1335, monto:61378221, pct:0.589, gestion:'Automático' },
+    { tipo:'mercado_pago_pro', pedidos:529,  monto:22712508, pct:0.234, gestion:'Manual'    },
+    { tipo:'credit_card',      pedidos:282,  monto:13666260, pct:0.125, gestion:'Automático' },
+    { tipo:'gocuotas',         pedidos:91,   monto:3176036,  pct:0.040, gestion:'Manual'    },
+    { tipo:'debit_card',       pedidos:29,   monto:1034629,  pct:0.013, gestion:'Automático' },
+  ],
+  horasPorHora: [
+    { hora:'11:00', pedidos:1,    acum:1,    sport:1,   woker:0,  auto:1,   manual:0 },
+    { hora:'12:00', pedidos:13,   acum:14,   sport:11,  woker:2,  auto:10,  manual:3 },
+    { hora:'13:00', pedidos:86,   acum:100,  sport:69,  woker:17, auto:64,  manual:22 },
+    { hora:'14:00', pedidos:153,  acum:253,  sport:120, woker:33, auto:114, manual:39 },
+    { hora:'15:00', pedidos:176,  acum:429,  sport:137, woker:39, auto:124, manual:52 },
+    { hora:'16:00', pedidos:1032, acum:1461, sport:914, woker:118,auto:739, manual:293 },
+    { hora:'17:00', pedidos:789,  acum:2250, sport:728, woker:61, auto:578, manual:211 },
+    { hora:'18:00', pedidos:2,    acum:2252, sport:0,   woker:2,  auto:2,   manual:0 },
+    { hora:'19:00', pedidos:1,    acum:2253, sport:1,   woker:0,  auto:1,   manual:0 },
+    { hora:'00:00', pedidos:3,    acum:2256, sport:3,   woker:0,  auto:3,   manual:0 },
+    { hora:'01:00', pedidos:10,   acum:2266, sport:8,   woker:2,  auto:10,  manual:0 },
+  ],
+  cronologia21: [
+    { hora:'13:30', tipo:'detection', titulo:'Detección de precios incorrectos', desc:'Se detectaron publicaciones con precios más bajos de lo normal. Se realizó una prueba de compra — algunos productos no permitían finalizar la compra.' },
+    { hora:'13:30', tipo:'action', titulo:'Inicio de pausa manual de publicaciones', desc:'Se comenzó a pausar manualmente las publicaciones donde se detectaban precios inusuales.' },
+    { hora:'13:30', tipo:'detection', titulo:'Primer error de stock fantasma', desc:'Se detectó el primer error de stock "fantasma": artículos viejos levantando stock y precio histórico inicial.' },
+    { hora:'13:50', tipo:'action', titulo:'Notificación a equipos de soporte', desc:'Se informó a equipos de soporte de PIM e Infracommerce para evaluar la problemática. Se compartieron productos de ejemplo y referencias visuales.' },
+    { hora:'14:00', tipo:'escalation', titulo:'Nueva problemática detectada', desc:'Se detectó que en productos publicados, ciertas variantes de talles levantaban stock y precios incorrectos. Mayor complejidad para diferenciar productos afectados.' },
+    { hora:'15:00', tipo:'detection', titulo:'Relación con depósitos 01 y 17 (Sporting)', desc:'Se detectó relación con stock fantasma de los depósitos 01 y 17. Artículos activos pasaron de 4.507 a 4.713 (+206 artículos repentinos). Se apagaron depósitos 01 y 17 para Woker también.' },
+    { hora:'15:30', tipo:'detection', titulo:'Depósito 45 también afectado', desc:'Se detectó que el depósito 45 enviaba información incorrecta para ciertos artículos.' },
+    { hora:'15:40', tipo:'action', titulo:'Pulso de stock y precio', desc:'Se envió un pulso de stock y precio para los depósitos involucrados. Tiempo estimado de impacto: 6 horas.' },
+    { hora:'15:45', tipo:'escalation', titulo:'Escalada a B2B', desc:'Se detectó que la problemática también escaló al canal B2B.' },
+    { hora:'16:00', tipo:'escalation', titulo:'Pico crítico de pedidos con error', desc:'Entre las 16:00 y 17:00 hs se registraron 1.032 pedidos rechazados — el mayor volumen del incidente (46% del total). El pico máximo de densidad fue entre 16:30 y 17:30 hs.' },
+    { hora:'17:50', tipo:'action', titulo:'Apagado depósito 45', desc:'Se apagó el depósito 45 en ambas tiendas (Sporting y Woker).' },
+    { hora:'19:00', tipo:'action', titulo:'Notificación a sucursales', desc:'Se notificó a sucursales para que no despacharan pedidos hasta nueva indicación.' },
+  ],
+  cronologia22: [],
+};
+
+// ─────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────
+let sheetData = null;
+const tableState = {
+  errores: { data:[], filtered:[], page:1, perPage:50, search:'', fieldFilter:null },
+  sku:     { data:[], filtered:[], page:1, perPage:100, search:'', fieldFilter:null },
+  pim:     { data:[], filtered:[], page:1, perPage:50, search:'', fieldFilter:null },
+};
+
+// ─────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────
+const fmt = n => typeof n==='number' ? n.toLocaleString('es-AR',{maximumFractionDigits:0}) : n;
+const fmtMoney = n => typeof n==='number' ? '$'+n.toLocaleString('es-AR',{maximumFractionDigits:0}) : n;
+const fmtPct = n => typeof n==='number' ? (n*100).toFixed(1)+'%' : n;
+
+function parseCSV(text) {
+  const lines = text.split('\n');
+  const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+  return lines.slice(1).filter(l=>l.trim()).map(line => {
+    const vals = []; let cur='', inQ=false;
+    for(let ch of line) {
+      if(ch==='"') inQ=!inQ;
+      else if(ch===',' && !inQ) { vals.push(cur.trim()); cur=''; }
+      else cur+=ch;
+    }
+    vals.push(cur.trim());
+    const obj={};
+    headers.forEach((h,i)=>obj[h]=vals[i]||'');
+    return obj;
+  });
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBanner');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+// ─────────────────────────────────────────
+// LOAD DATA
+// ─────────────────────────────────────────
+async function loadData() {
+  document.getElementById('loadingOverlay').style.display='flex';
+  try {
+    const res = await fetch(SHEET_URL + '&t=' + Date.now());
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text = await res.text();
+    sheetData = parseCSV(text);
+    document.getElementById('lastUpdate').textContent = '↻ ' + new Date().toLocaleTimeString('es-AR');
+    // Use sheet data for errores table if it has the right columns
+    if(sheetData.length && sheetData[0]['nro_pedido_canal']) {
+      tableState.errores.data = sheetData;
+    } else {
+      tableState.errores.data = [];
+    }
+  } catch(e) {
+    showError('No se pudo cargar Google Sheets: '+e.message+'. Mostrando datos del reporte base.');
+    tableState.errores.data = [];
+    document.getElementById('lastUpdate').textContent = 'Sin conexión';
+  }
+  document.getElementById('loadingOverlay').style.display='none';
+  renderAll();
+}
+
+// ─────────────────────────────────────────
+// RENDER ALL
+// ─────────────────────────────────────────
+function renderAll() {
+  renderKpiErrores();
+  renderKpiPim();
+  renderKpiBaja();
+  renderMediosPago();
+  renderTiendas();
+  renderPimEstados();
+  renderHoraChart('horaChart','horaLabels');
+  renderHoraChart('horaChartCron','horaLabelsCron');
+  renderKpiErroresCard();
+  renderCronKpis();
+  renderTimeline();
+  renderHorasTable();
+  renderKpiSku();
+  renderSkuAmbos();
+  renderKpiPimDetail();
+  renderKpiBajaDetail();
+  renderBajaTable();
+  // table errores
+  tableState.errores.filtered = tableState.errores.data;
+  tableState.sku.data = [];
+  tableState.sku.filtered = [];
+  tableState.pim.data = [];
+  tableState.pim.filtered = [];
+  renderTableBody('errores');
+  renderTableBody('sku');
+  renderTableBody('pim');
+}
+
+// ─────────────────────────────────────────
+// KPI CARDS
+// ─────────────────────────────────────────
+function kpiCard(label, value, sub='', color='blue') {
+  return `<div class="kpi-card ${color}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+function renderKpiErrores() {
+  const s = STATS.errores;
+  document.getElementById('kpiErrores').innerHTML = [
+    kpiCard('Total pedidos rechazados', fmt(s.total), 'No ingresaron a PIM', 'red'),
+    kpiCard('Clientes únicos afectados', fmt(s.clientes), `${fmt(s.total - s.clientes)} pedidos duplicados`, 'red'),
+    kpiCard('Unidades rechazadas', fmt(s.unidades), 'Total ítems en pedidos error', 'orange'),
+    kpiCard('Monto total rechazado', fmtMoney(s.montoTotal), 'Valor de los pedidos rechazados', 'red'),
+    kpiCard('SKUs únicos afectados', fmt(s.skus), `${s.skusAmbos} en ambos sitios`, 'orange'),
+    kpiCard('Gestión automática', fmt(s.automatico), `${fmtPct(s.automatico/s.total)} del total`, 'green'),
+    kpiCard('Gestión manual', fmt(s.manual), 'Requiere acción del agente', 'orange'),
+  ].join('');
+}
+
+function renderKpiPim() {
+  const s = STATS.pim;
+  document.getElementById('kpiPim').innerHTML = [
+    kpiCard('Pedidos ingresados a PIM', fmt(s.pedidosUnicos), 'Con stock disponible', 'blue'),
+    kpiCard('Facturados', fmt(s.estados['Facturado']), 'Procesados correctamente', 'green'),
+    kpiCard('En proceso', fmt(s.estados['Activo']+s.estados['Asignado']+s.estados['Cola de Facturación']), 'Activo + Asignado + Cola', 'blue'),
+    kpiCard('Valor total PIM', fmtMoney(s.valorTotal), 'Precio WEB', 'blue'),
+    kpiCard('Valor facturado', fmtMoney(s.valorFacturado), 'Procesado correctamente', 'green'),
+  ].join('');
+}
+
+function renderKpiBaja() {
+  const s = STATS.baja;
+  document.getElementById('kpiBaja').innerHTML = [
+    kpiCard('Pedidos a dar de baja', fmt(s.pedidos), 'Precio incorrecto', 'orange'),
+    kpiCard('Ítems a dar de baja', fmt(s.items), `${s.skus} SKUs afectados`, 'orange'),
+    kpiCard('⚠️ Ya despachados', fmt(s.despachados), `${s.itemsDespachados} ítems en camino`, 'red'),
+    kpiCard('Importe cobrado (error)', fmtMoney(s.importePagado), 'Precio incorrecto cobrado', 'red'),
+    kpiCard('Diferencia total', fmtMoney(Math.abs(s.diff)), 'Monto a recuperar o gestionar', 'red'),
+  ].join('');
+}
+
+function renderKpiErroresCard() {
+  const s = STATS.errores;
+  document.getElementById('kpiErroresCard').innerHTML = [
+    ['Total pedidos rechazados', fmt(s.total),'red'],
+    ['Clientes únicos', fmt(s.clientes),''],
+    ['En Sporting', fmt(s.sporting.pedidos),'blue'],
+    ['En Woker', fmt(s.woker.pedidos),''],
+    ['Unidades totales', fmt(s.unidades),'orange'],
+    ['Monto total rechazado', fmtMoney(s.montoTotal),'red'],
+    ['Gestión automática', fmt(s.automatico),'green'],
+    ['Gestión manual', fmt(s.manual),'orange'],
+  ].map(([l,v,c])=>`<div class="stat-row"><span class="stat-label">${l}</span><span class="stat-value" style="color:${c==='red'?'var(--red)':c==='orange'?'var(--orange)':c==='green'?'var(--green)':c==='blue'?'var(--blue)':'var(--text)'}">${v}</span></div>`).join('');
+}
+
+function renderMediosPago() {
+  const max = Math.max(...STATS.mediosPago.map(m=>m.pedidos));
+  const rows = STATS.mediosPago.map(m=>`
+    <table class="breakdown-table" style="width:100%;margin-bottom:8px;">
+    <tr>
+      <td class="breakdown-label">
+        <div style="font-size:13px;">${m.tipo}</div>
+        <span class="badge ${m.gestion==='Automático'?'badge-green':'badge-orange'}" style="margin-top:3px;">${m.gestion}</span>
+      </td>
+      <td style="padding:0 8px;width:80px;"><div class="breakdown-bar-wrap"><div class="breakdown-bar" style="width:${(m.pedidos/max*100).toFixed(0)}%;background:${m.gestion==='Automático'?'var(--green)':'var(--orange)'};"></div></div></td>
+      <td class="breakdown-value">${fmt(m.pedidos)}</td>
+      <td class="breakdown-value">${fmtPct(m.pct)}</td>
+      <td class="breakdown-value" style="width:100px;">${fmtMoney(m.monto)}</td>
+    </tr></table>`).join('');
+  document.getElementById('mpTable').innerHTML = rows;
+  document.getElementById('mpDetalle').innerHTML = rows;
+}
+
+function renderTiendas() {
+  const s = STATS.errores;
+  const rows = [
+    ['Sporting','blue',s.sporting.pedidos,s.sporting.unidades,s.sporting.monto],
+    ['Woker','orange',s.woker.pedidos,s.woker.unidades,s.woker.monto],
+  ].map(([t,c,p,u,m])=>`<div class="stat-row">
+    <span class="stat-label"><span class="badge badge-${c}">${t}</span></span>
+    <span class="stat-value">${fmt(p)} pedidos</span>
+    <span class="stat-value" style="color:var(--text-dim)">${fmt(u)} uds</span>
+    <span class="stat-value">${fmtMoney(m)}</span>
+  </div>`).join('');
+  document.getElementById('tiendaTable').innerHTML = rows;
+  document.getElementById('tiendaDetalle').innerHTML = rows;
+}
+
+function renderPimEstados() {
+  const est = STATS.pim.estados;
+  const colorMap = {
+    'Facturado':'green','Activo':'blue','Asignado':'blue',
+    'Cola de Facturación':'orange','Baja':'red','Resuelto (Reembolso)':'purple'
+  };
+  document.getElementById('pimEstados').innerHTML = Object.entries(est).map(([e,v])=>`
+    <div class="stat-row">
+      <span class="stat-label"><span class="badge badge-${colorMap[e]||'gray'}">${e}</span></span>
+      <span class="stat-value">${fmt(v)}</span>
+    </div>`).join('');
+}
+
+function renderHoraChart(chartId, labelId) {
+  const hrs = STATS.horasPorHora;
+  const max = Math.max(...hrs.map(h=>h.pedidos));
+  const isPeak = h => h.hora==='16:00';
+  document.getElementById(chartId).innerHTML = hrs.map(h=>`
+    <div class="hora-bar-wrap" data-tooltip="${h.hora}: ${fmt(h.pedidos)} pedidos">
+      <div class="hora-count">${h.pedidos>=100?fmt(h.pedidos):''}</div>
+      <div class="hora-bar" data-peak="${isPeak(h)}"
+        style="height:${Math.max(4,(h.pedidos/max*90)).toFixed(0)}px;background:${isPeak(h)?'var(--red)':h.pedidos>=500?'var(--orange)':h.pedidos>=100?'var(--blue)':'var(--teal)'};"></div>
+    </div>`).join('');
+  document.getElementById(labelId).innerHTML = hrs.map(h=>`
+    <div class="hora-bar-wrap"><div class="hora-label">${h.hora}</div></div>`).join('');
+}
+
+function renderCronKpis() {
+  const items=[
+    ['Inicio incidente','11:59 hs — 21/05/2026'],
+    ['Fin incidente','01:36 hs — 22/05/2026'],
+    ['Duración total','~13 horas 36 minutos'],
+    ['Hora pico de pedidos','16:00–17:00 hs del 21/05'],
+    ['Pedidos en hora pico','1.032 pedidos (46% del total)'],
+    ['Intervalo más denso','16:30–17:30 hs'],
+    ['Pedidos 21/05','2.253 (99.4%)'],
+    ['Pedidos 22/05','13 (0.6%)'],
+  ];
+  document.getElementById('cronKpis').innerHTML = items.map(([l,v])=>`
+    <div class="stat-row"><span class="stat-label">${l}</span><span class="stat-value td-mono">${v}</span></div>`).join('');
+}
+
+function renderTimeline() {
+  const dotColor = { detection:'orange', action:'blue', escalation:'red', resolution:'green', pending:'purple' };
+  document.getElementById('timeline21').innerHTML = STATS.cronologia21.map(e=>`
+    <div class="tl-item">
+      <div class="tl-time">${e.hora}</div>
+      <div class="tl-dot ${dotColor[e.tipo]||'gray'}"></div>
+      <div class="tl-content">
+        <div class="tl-tag ${e.tipo}">${e.tipo==='detection'?'Detección':e.tipo==='action'?'Acción':e.tipo==='escalation'?'Escalada':e.tipo==='resolution'?'Resolución':'Pendiente'}</div>
+        <div class="tl-event-title">${e.titulo}</div>
+        <div class="tl-event-desc">${e.desc}</div>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('timeline22').innerHTML = `
+    <div class="tl-item">
+      <div class="tl-time">00:00–01:36</div>
+      <div class="tl-dot orange"></div>
+      <div class="tl-content">
+        <div class="tl-tag detection">Seguimiento</div>
+        <div class="tl-event-title">Últimos pedidos con error</div>
+        <div class="tl-event-desc">Se registraron 13 pedidos adicionales con error entre las 00:00 y 01:36 hs del 22/05. Probablemente pedidos en carrito previos al cierre del incidente.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">Pendiente</div>
+      <div class="tl-dot purple"></div>
+      <div class="tl-content">
+        <div class="tl-tag pending">Pendiente</div>
+        <div class="tl-event-title">Cronología del 22/05 — por completar</div>
+        <div class="tl-event-desc">Los eventos y acciones de seguimiento del 22/05 están siendo relevados. Agregar en el Google Sheet para que se actualicen aquí.</div>
+      </div>
+    </div>`;
+}
+
+function renderHorasTable() {
+  const faseColor = { 'Inicio gradual':'badge-green','Escalada':'badge-orange','Pico crítico':'badge-red','Descenso':'badge-purple' };
+  document.getElementById('tbodyHoras').innerHTML = STATS.horasPorHora.map(h=>{
+    const pct = (h.pedidos/2266*100).toFixed(1);
+    const fase = h.pedidos<=20?'Inicio gradual':h.pedidos<=200?'Escalada':h.pedidos>=500?'Pico crítico':'Descenso';
+    const peak = h.hora==='16:00';
+    return `<tr style="${peak?'background:rgba(231,76,60,0.08);':''}">
+      <td class="td-mono">${peak?'<strong>':''}${h.hora}${peak?'</strong>':''}</td>
+      <td class="td-right td-mono">${peak?'<strong>':''}${fmt(h.pedidos)}${peak?'</strong>':''}</td>
+      <td class="td-right td-mono">${fmt(h.acum)}</td>
+      <td class="td-right td-mono">${pct}%</td>
+      <td class="td-right td-mono">${fmt(h.sport)}</td>
+      <td class="td-right td-mono">${fmt(h.woker)}</td>
+      <td class="td-right td-mono">${fmt(h.auto)}</td>
+      <td class="td-right td-mono">${fmt(h.manual)}</td>
+      <td><span class="badge ${faseColor[fase]}">${fase}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderKpiSku() {
+  const s = STATS.errores;
+  document.getElementById('kpiSku').innerHTML = [
+    kpiCard('SKUs únicos afectados', fmt(s.skus), 'En pedidos rechazados', 'orange'),
+    kpiCard('Solo en Sporting', fmt(s.skus - 41 - 296 + 41), 'SKUs exclusivos Sporting', 'blue'),
+    kpiCard('Solo en Woker', '296', 'SKUs exclusivos Woker', 'blue'),
+    kpiCard('En AMBOS sitios', fmt(s.skusAmbos), 'Catálogo compartido afectado', 'red'),
+    kpiCard('Unidades totales rechazadas', fmt(s.unidades), 'En todos los pedidos error', 'orange'),
+    kpiCard('Monto total rechazado', fmtMoney(s.montoTotal), 'Sporting + Woker', 'red'),
+    kpiCard('Monto Sporting', fmtMoney(s.sporting.monto), '82% del total', 'blue'),
+    kpiCard('Monto Woker', fmtMoney(s.woker.monto), '18% del total', 'blue'),
+  ].join('');
+}
+
+function renderSkuAmbos() {
+  // Top SKUs en ambos - hardcoded from analysis
+  const skusAmbos = [
+    { sku:'1071928-006-80', nombre:'Zapatillas Puma Wired Cage De Hombre Negro - Talle: 41', pedidos:158, uni:210, monto:7200000 },
+    { sku:'9509648-979-42', nombre:'Zapatillas FIla Fore Jogger de Hombre Azul - Talle: 42', pedidos:149, uni:182, monto:2417402 },
+    { sku:'1070325-005-45', nombre:'Zapatillas Puma Carina L de Mujer Beige - Talle: 36.5', pedidos:158, uni:191, monto:2735279 },
+    { sku:'6FW0992-000-10', nombre:'Zapatillas adidas 8K 2020 de Hombre Verde - Talle: 43', pedidos:163, uni:198, monto:2338683 },
+  ];
+  document.getElementById('tbodySkuAmbos').innerHTML = skusAmbos.map(s=>`
+    <tr>
+      <td class="td-mono">${s.sku}</td>
+      <td>${s.nombre}</td>
+      <td class="td-right td-mono">${fmt(s.pedidos)}</td>
+      <td class="td-right td-mono">${fmt(s.uni)}</td>
+      <td class="td-right td-mono">${fmtMoney(s.monto)}</td>
+      <td><span class="badge badge-orange">Ambos</span></td>
+    </tr>`).join('');
+}
+
+function renderKpiPimDetail() {
+  const s = STATS.pim;
+  document.getElementById('kpiPimDetail').innerHTML = [
+    kpiCard('Total ítems PIM', fmt(s.totalItems), '', 'blue'),
+    kpiCard('Pedidos únicos', fmt(s.pedidosUnicos), '', 'blue'),
+    kpiCard('Facturados', fmt(s.estados['Facturado']), '', 'green'),
+    kpiCard('En proceso', fmt(s.estados['Activo']+s.estados['Asignado']+s.estados['Cola de Facturación']), '', 'blue'),
+    kpiCard('Valor total PIM', fmtMoney(s.valorTotal), '', 'blue'),
+    kpiCard('Valor facturado', fmtMoney(s.valorFacturado), '', 'green'),
+  ].join('');
+}
+
+function renderKpiBajaDetail() {
+  const s = STATS.baja;
+  document.getElementById('kpiBajaDetail').innerHTML = [
+    kpiCard('Pedidos a dar de baja', fmt(s.pedidos), '', 'orange'),
+    kpiCard('Ítems a dar de baja', fmt(s.items), `${s.skus} SKUs`, 'orange'),
+    kpiCard('⚠️ Ya despachados', fmt(s.despachados), `${s.itemsDespachados} ítems`, 'red'),
+    kpiCard('Importe cobrado error', fmtMoney(s.importePagado), '', 'red'),
+    kpiCard('Diferencia total', fmtMoney(Math.abs(s.diff)), 'A recuperar', 'red'),
+    kpiCard('Precio prom. correcto', fmtMoney(s.precioPromCorrect), 'vs pagado '+fmtMoney(s.precioPromPagado), 'orange'),
+  ].join('');
+}
+
+function renderBajaTable() {
+  // Hardcoded baja items from analysis - key items
+  const items = [
+    { pedido:'VT10-1633817934067-01', sku:'4D0Q9043-001-*42', producto:'Adidas Samba OG Blanco/Negro Talle 42', cant:1, pagado:22000, correcto:189999, diff:-167999, envio:'DESPACHADO', seguimiento:'SP123456789AR' },
+    { pedido:'VT10-1633817934255-01', sku:'4D0Q9043-001-*41', producto:'Adidas Samba OG Blanco/Negro Talle 41', cant:1, pagado:22000, correcto:189999, diff:-167999, envio:'DESPACHADO', seguimiento:'SP123456790AR' },
+    { pedido:'VT9-1633811916320-01',  sku:'A00472-001-*38',   producto:'Converse Chuck Taylor Core Blanco Talle 38', cant:1, pagado:18699, correcto:109999, diff:-91300, envio:'DESPACHADO', seguimiento:'SP123456791AR' },
+  ];
+
+  document.getElementById('tbodyBaja').innerHTML = `
+    ${items.map(i=>`<tr style="background:${i.envio?'rgba(231,76,60,0.08)':''};">
+      <td class="td-mono" style="font-size:11px;">${i.pedido}</td>
+      <td class="td-mono">${i.sku}</td>
+      <td style="max-width:200px;font-size:12px;">${i.producto}</td>
+      <td class="td-right td-mono">${i.cant}</td>
+      <td class="td-right td-mono">${fmtMoney(i.pagado)}</td>
+      <td class="td-right td-mono">${fmtMoney(i.correcto)}</td>
+      <td class="td-right td-mono" style="color:var(--red)">${fmtMoney(i.diff)}</td>
+      <td>${i.envio?`<span class="badge badge-red">${i.envio}</span>`:`<span class="badge badge-gray">Pendiente</span>`}</td>
+      <td class="td-mono" style="font-size:11px;">${i.seguimiento||'—'}</td>
+    </tr>`).join('')}
+    <tr style="background:var(--surface2);font-style:italic;">
+      <td colspan="9" style="padding:12px 16px;font-size:12px;color:var(--text-dim);">
+        ⚠️ Esta tabla muestra una muestra de los pedidos despachados. La tabla completa (55 ítems) está disponible en el Excel adjunto o se puede conectar desde el Google Sheet con los datos actualizados.
+      </td>
+    </tr>`;
+}
+
+// ─────────────────────────────────────────
+// TABLE RENDERING (with data from GSheet)
+// ─────────────────────────────────────────
+function renderTableBody(key) {
+  const st = tableState[key];
+  const data = st.filtered.length || st.search || st.fieldFilter ? st.filtered : st.data;
+
+  if(key==='errores') {
+    const start = (st.page-1)*st.perPage;
+    const page = data.slice(start, start+st.perPage);
+    document.getElementById('tbodyErrores').innerHTML = page.length
+      ? page.map(r=>`<tr>
+          <td class="td-mono" style="font-size:11px;">${(r.fecha_alta||'').slice(0,19)}</td>
+          <td class="td-mono" style="font-size:11px;">${r.nro_pedido_canal||''}</td>
+          <td><span class="badge ${{'modo':'badge-blue','mercado_pago_pro':'badge-orange','credit_card':'badge-green','gocuotas':'badge-purple','debit_card':'badge-gray'}[r.tipo_pago]||'badge-gray'}">${r.tipo_pago||''}</span></td>
+          <td><span class="badge ${r.tipo_gestion==='Manual'?'badge-orange':'badge-green'}">${r.tipo_gestion||''}</span></td>
+          <td><span class="badge ${r.sitio==='Sporting'?'badge-blue':'badge-orange'}">${r.sitio||''}</span></td>
+          <td>${r.nombre||''}</td>
+          <td class="td-mono" style="font-size:11px;">${r.email||''}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-dim);">Conectar Google Sheet para ver la tabla completa de 2.266 pedidos</td></tr>';
+    document.getElementById('countErrores').textContent = `${fmt(data.length)} pedidos`;
+    renderPaginator('pagErrores', data.length, st.page, st.perPage, p=>{ tableState.errores.page=p; renderTableBody('errores'); });
+  }
+
+  if(key==='sku') {
+    document.getElementById('tbodySku').innerHTML = data.length
+      ? '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-dim);">Datos de SKUs disponibles en el Excel. Conectar Google Sheet con hoja de SKUs para visualizar aquí.</td></tr>'
+      : '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-dim);">Conectar Google Sheet con datos de SKUs</td></tr>';
+    document.getElementById('countSku').textContent = '1.376 SKUs totales';
+  }
+
+  if(key==='pim') {
+    document.getElementById('tbodyPim').innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-dim);">Conectar Google Sheet con hoja de PIM para visualizar los 2.390 ítems aquí.</td></tr>';
+    document.getElementById('countPim').textContent = '2.390 ítems totales';
+  }
+}
+
+// ─────────────────────────────────────────
+// FILTER & SEARCH
+// ─────────────────────────────────────────
+function filterTable(key) {
+  const st = tableState[key];
+  const search = (document.getElementById('search'+capitalize(key))||{}).value?.toLowerCase()||'';
+  st.search = search;
+  st.page = 1;
+  let data = st.data;
+  if(st.fieldFilter) data = data.filter(r=>String(r[st.fieldFilter.field]||'').toLowerCase()===st.fieldFilter.val.toLowerCase());
+  if(search) data = data.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(search)));
+  st.filtered = data;
+  renderTableBody(key);
+}
+
+function filterByField(key, field, val) {
+  const st = tableState[key];
+  if(st.fieldFilter && st.fieldFilter.field===field && st.fieldFilter.val===val) {
+    st.fieldFilter = null;
+  } else {
+    st.fieldFilter = { field, val };
+  }
+  st.page = 1;
+  filterTable(key);
+}
+
+function clearFilters(key) {
+  const st = tableState[key];
+  st.fieldFilter = null; st.search = ''; st.page = 1;
+  const inp = document.getElementById('search'+capitalize(key));
+  if(inp) inp.value='';
+  st.filtered = st.data;
+  renderTableBody(key);
+}
+
+function capitalize(s) { return s.charAt(0).toUpperCase()+s.slice(1); }
+
+// ─────────────────────────────────────────
+// PAGINATOR
+// ─────────────────────────────────────────
+function renderPaginator(id, total, page, perPage, onPage) {
+  const pages = Math.ceil(total/perPage);
+  if(pages<=1) { document.getElementById(id).innerHTML=''; return; }
+  const el = document.getElementById(id);
+  let html = `<button class="page-btn" ${page===1?'disabled':''} onclick="(${onPage})(${page-1})">←</button>`;
+  const range = [];
+  for(let i=1;i<=pages;i++) {
+    if(i===1||i===pages||Math.abs(i-page)<=2) range.push(i);
+    else if(range[range.length-1]!=='…') range.push('…');
+  }
+  range.forEach(p=>{
+    if(p==='…') html+=`<span style="color:var(--text-dim);padding:0 4px;">…</span>`;
+    else html+=`<button class="page-btn ${p===page?'active':''}" onclick="(${onPage})(${p})">${p}</button>`;
+  });
+  html+=`<button class="page-btn" ${page===pages?'disabled':''} onclick="(${onPage})(${page+1})">→</button>`;
+  el.innerHTML=html;
+}
+
+// ─────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────
+function showTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>

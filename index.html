@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Incidente PIM - Dashboard operativo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <p>Cargando datos del incidente...</p>
+  </div>
+
+  <header class="site-header">
+    <div>
+      <p class="eyebrow">Analisis de incidencia PIM</p>
+      <h1>Incidente precio y stock</h1>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill" id="sourceStatus">Conectando</span>
+      <span class="last-update" id="lastUpdate">Sin actualizar</span>
+      <button class="icon-button" id="refreshButton" type="button" title="Actualizar datos">↻</button>
+    </div>
+  </header>
+
+  <nav class="nav-tabs" aria-label="Secciones del tablero">
+    <button class="nav-tab active" type="button" data-tab="resumen">Resumen</button>
+    <button class="nav-tab" type="button" data-tab="errores">Pedidos con error</button>
+    <button class="nav-tab" type="button" data-tab="cronologia">Cronologia</button>
+    <button class="nav-tab" type="button" data-tab="sku">SKU</button>
+    <button class="nav-tab" type="button" data-tab="pim">PIM y bajas</button>
+  </nav>
+
+  <main class="main">
+    <section class="notice hidden" id="errorBanner"></section>
+
+    <section class="tab-panel active" id="tab-resumen">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Vista ejecutiva</p>
+          <h2>Que paso y donde mirar primero</h2>
+        </div>
+        <p class="section-note">Los indicadores se recalculan desde la base conectada. Si el Sheet solo trae una pestaña, el tablero muestra esa capa y marca el resto como pendiente.</p>
+      </div>
+
+      <div class="risk-strip" id="riskStrip"></div>
+      <div class="kpi-grid" id="summaryKpis"></div>
+
+      <div class="dashboard-grid">
+        <article class="panel">
+          <div class="panel-header">
+            <h3>Medios de pago</h3>
+            <span>Gestion</span>
+          </div>
+          <div id="paymentBreakdown"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <h3>Pico horario</h3>
+            <span>Hora real</span>
+          </div>
+          <div class="hour-chart" id="hourChart"></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="tab-errores">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Pedidos rechazados</p>
+          <h2>Pedidos con error</h2>
+        </div>
+        <p class="section-note">Base orientada a pedidos que no ingresaron a PIM. Permite ubicar medio de pago, horario y numero de pedido.</p>
+      </div>
+
+      <div class="toolbar">
+        <input class="search-input" id="searchErrores" type="search" placeholder="Buscar pedido, medio de pago o fecha">
+        <button class="filter-btn" type="button" data-filter-table="errores" data-filter-field="tipo_pago" data-filter-value="mercado_pago_pro">MercadoPago Pro</button>
+        <button class="filter-btn" type="button" data-filter-table="errores" data-filter-field="tipo_pago" data-filter-value="modo">MODO</button>
+        <button class="filter-btn" type="button" data-filter-table="errores" data-filter-clear="true">Limpiar</button>
+        <span class="row-count" id="countErrores"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha alta</th>
+              <th>Nro pedido canal</th>
+              <th>Medio de pago</th>
+              <th>Hora real</th>
+              <th>Gestion sugerida</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyErrores"></tbody>
+        </table>
+      </div>
+      <div class="paginator" id="pagerErrores"></div>
+    </section>
+
+    <section class="tab-panel" id="tab-cronologia">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Seguimiento</p>
+          <h2>Cronologia del incidente</h2>
+        </div>
+        <p class="section-note">Esta seccion queda lista para cargarse desde una hoja llamada <strong>cronologia</strong> en Apps Script.</p>
+      </div>
+
+      <div class="timeline" id="timeline"></div>
+    </section>
+
+    <section class="tab-panel" id="tab-sku">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Productos afectados</p>
+          <h2>Analisis por SKU</h2>
+        </div>
+        <p class="section-note">Cuando el Apps Script exponga la hoja de SKU, esta tabla mostrara productos compartidos, unidades y monto afectado.</p>
+      </div>
+
+      <div class="empty-state" id="skuEmpty">
+        <h3>Pendiente de conectar hoja SKU</h3>
+        <p>Agregar una pestana <strong>sku_resumen</strong> o consolidar SKU en el Apps Script para habilitar esta vista.</p>
+      </div>
+      <div class="table-wrap hidden" id="skuTableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Producto</th>
+              <th>Sitios</th>
+              <th class="td-right">Pedidos</th>
+              <th class="td-right">Unidades</th>
+              <th class="td-right">Monto</th>
+            </tr>
+          </thead>
+          <tbody id="tbodySku"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="tab-pim">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Gestion PIM</p>
+          <h2>PIM y bajas</h2>
+        </div>
+        <p class="section-note">Prioriza pedidos a dar de baja y marca envios con seguimiento para accion logistica.</p>
+      </div>
+
+      <div class="kpi-grid" id="pimKpis"></div>
+
+      <div class="toolbar">
+        <input class="search-input" id="searchBajas" type="search" placeholder="Buscar pedido, SKU, producto o seguimiento">
+        <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-field="Estado envio" data-filter-value="A">Despachados</button>
+        <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-clear="true">Limpiar</button>
+        <span class="row-count" id="countBajas"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nro pedido</th>
+              <th>SKU</th>
+              <th>Producto</th>
+              <th class="td-right">Cant.</th>
+              <th class="td-right">Pagado</th>
+              <th class="td-right">Precio actual</th>
+              <th class="td-right">Diff</th>
+              <th>Envio</th>
+              <th>Seguimiento</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyBajas"></tbody>
+        </table>
+      </div>
+      <div class="paginator" id="pagerBajas"></div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

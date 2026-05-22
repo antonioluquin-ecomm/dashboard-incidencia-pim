@@ -106,6 +106,15 @@ function buildPayload_() {
   var summary = buildSummary_(pedidosError.rows, pedidosPim.rows, pedidosVtex.rows, pedidosVtexError);
   var health = buildHealth_([pedidosError, pedidosPim, pedidosVtex]);
 
+  // Validate price columns needed for financial calculations (multi-alias, not coverable by REQUIRED_COLUMNS)
+  validateAliasColumns_(health, "pedidosPim", pedidosPim.headers, [
+    { label: "precio pagado (PrecioWEB / Imp. Pagado)", aliases: ["PrecioWEB", "Precio WEB", "Precio Web", "Imp. Pagado", "Importe Pagado", "importe_pagado"] },
+    { label: "precio correcto (PrecioPIM / Precio Correcto)", aliases: ["PrecioPIM", "Precio PIM", "Precio Correcto", "precio_actual", "Precio Actual"] }
+  ]);
+  validateAliasColumns_(health, "pedidosVtex", pedidosVtex.headers, [
+    { label: "monto por pedido (SKU Total Price / Payment Value)", aliases: ["SKU Total Price", "Total Value", "Payment Value", "monto"] }
+  ]);
+
   return {
     updatedAt: new Date().toISOString(),
     health: health,
@@ -595,6 +604,22 @@ function findMissingColumns_(headers, requiredColumns) {
   var normalizedHeaders = headers.map(normalizeHeader_);
   return requiredColumns.filter(function(column) {
     return normalizedHeaders.indexOf(normalizeHeader_(column)) < 0;
+  });
+}
+
+// Checks alias groups: marks a column as missing only if NONE of its aliases appear in headers.
+function validateAliasColumns_(health, sheetKey, headers, checks) {
+  var normalizedHeaders = headers.map(normalizeHeader_);
+  var sheetHealth = health.sheets[sheetKey];
+  if (!sheetHealth) return;
+  checks.forEach(function(check) {
+    var found = check.aliases.some(function(alias) {
+      return normalizedHeaders.indexOf(normalizeHeader_(alias)) >= 0;
+    });
+    if (!found) {
+      sheetHealth.missingColumns.push(check.label);
+      health.status = "warning";
+    }
   });
 }
 

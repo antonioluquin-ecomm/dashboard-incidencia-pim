@@ -1,8 +1,9 @@
-const CACHE_KEY = "pim_incident_dashboard_v2";
+const CACHE_KEY = "pim_incident_dashboard_v3";
 const CACHE_TTL_SECONDS = 300;
 const HIGH_DIFF_THRESHOLD = 100000;
 const SKU_IMPACT_LIMIT = 120;
 const SHARED_SKU_LIMIT = 50;
+const REFERENCE_TICKET_ACTUAL = 135000;
 
 const SHEETS = {
   pedidosError: ["pedidos_error", "Pedidos con Error", "1-Pedidos con Error"],
@@ -60,26 +61,27 @@ function buildPayload_() {
   var darDeBaja = readSheet_(SHEETS.darDeBaja, REQUIRED_COLUMNS.darDeBaja);
   var cronologia = readSheet_(SHEETS.cronologia, []);
   var skuResumen = readSheet_(SHEETS.skuResumen, []);
+  var pedidosVtexError = filterVtexByPedidosError_(pedidosVtex.rows, pedidosError.rows);
 
-  var summary = buildSummary_(pedidosError.rows, pedidosPim.rows, pedidosVtex.rows, darDeBaja.rows);
+  var summary = buildSummary_(pedidosError.rows, pedidosPim.rows, pedidosVtex.rows, pedidosVtexError, darDeBaja.rows);
   var health = buildHealth_([pedidosError, pedidosPim, pedidosVtex, darDeBaja]);
 
   return {
     updatedAt: new Date().toISOString(),
     health: health,
     summary: summary,
-    paymentBreakdown: buildPaymentBreakdown_(pedidosError.rows),
-    storeBreakdown: buildStoreBreakdown_(pedidosVtex.rows),
+    paymentBreakdown: buildPaymentBreakdown_(pedidosError.rows, pedidosVtexError),
+    storeBreakdown: buildStoreBreakdown_(pedidosVtexError),
     hourlyError: buildHourlyError_(pedidosError.rows),
-    financialImpact: buildFinancialImpact_(pedidosError.rows, pedidosPim.rows, pedidosVtex.rows, darDeBaja.rows, summary),
-    skuImpact: skuResumen.rows.length ? buildSkuImpactFromSummary_(skuResumen.rows) : buildSkuImpactFromVtex_(pedidosVtex.rows),
-    skuAmbosSitios: buildSkuAmbosSitios_(pedidosVtex.rows),
+    financialImpact: buildFinancialImpact_(pedidosError.rows, pedidosPim.rows, pedidosVtexError, darDeBaja.rows, summary),
+    skuImpact: skuResumen.rows.length ? buildSkuImpactFromSummary_(skuResumen.rows) : buildSkuImpactFromVtex_(pedidosVtexError),
+    skuAmbosSitios: buildSkuAmbosSitios_(pedidosVtexError),
     bajasPrioritarias: buildBajasPrioritarias_(darDeBaja.rows),
     cronologia: buildCronologia_(cronologia.rows)
   };
 }
 
-function buildSummary_(pedidosError, pedidosPim, pedidosVtex, darDeBaja) {
+function buildSummary_(pedidosError, pedidosPim, pedidosVtex, pedidosVtexError, darDeBaja) {
   var manual = pedidosError.filter(function(row) {
     return MANUAL_PAYMENT_METHODS.indexOf(normalizeText_(getAny_(row, ["tipo_pago", "Payment System Name", "Medio de Pago"]))) >= 0;
   }).length;
@@ -87,6 +89,7 @@ function buildSummary_(pedidosError, pedidosPim, pedidosVtex, darDeBaja) {
   var pedidoPimIds = uniqueValues_(pedidosPim, ["Nro Pedido", "nro_pedido_canal", "Nro pedido"]);
   var pedidoVtexIds = uniqueValues_(pedidosVtex, ["Order", "Nro Pedido", "nro_pedido_canal"]);
   var bajaPedidoIds = uniqueValues_(darDeBaja, ["nro_pedido_canal", "Nro Pedido", "pedido"]);
+  var errorSkuIds = uniqueValues_(pedidosVtexError, ["Reference Code", "SKU", "Sku", "sku", "ID_SKU"]);
 
   return {
     pedidosError: pedidosError.length,
@@ -96,6 +99,9 @@ function buildSummary_(pedidosError, pedidosPim, pedidosVtex, darDeBaja) {
     pedidosPimUnicos: pedidoPimIds.length,
     pedidosVtexItems: pedidosVtex.length,
     pedidosVtexUnicos: pedidoVtexIds.length,
+    unidadesRechazadas: sumRows_(pedidosVtexError, ["Quantity_SKU", "Cantidad", "cantidad"]),
+    skusErrorUnicos: errorSkuIds.length,
+    montoRechazado: sumRows_(pedidosVtexError, ["SKU Total Price", "Total Value", "Payment Value", "monto"]),
     bajaItems: darDeBaja.length,
     bajaPedidos: bajaPedidoIds.length,
     despachados: despachados,
@@ -104,15 +110,15 @@ function buildSummary_(pedidosError, pedidosPim, pedidosVtex, darDeBaja) {
   };
 }
 
-function buildFinancialImpact_(pedidosError, pedidosPim, pedidosVtex, darDeBaja, summary) {
-  var errorAmount = sumRows_(pedidosVtex, ["SKU Total Price", "Total Value", "Payment Value", "monto"]);
+function buildFinancialImpact_(pedidosError, pedidosPim, pedidosVtexError, darDeBaja, summary) {
+  var errorAmount = summary.montoRechazado || sumRows_(pedidosVtexError, ["SKU Total Price", "Total Value", "Payment Value", "monto"]);
   var pimValue = sumRows_(pedidosPim, ["PrecioWEB", "Precio Web", "Valor", "PrecioPIM"]);
   var facturadoValue = pedidosPim.filter(function(row) {
     return normalizeText_(getAny_(row, ["Estado Actual", "estado"])) === "facturado";
   }).reduce(function(total, row) {
     return total + toNumber_(getAny_(row, ["PrecioWEB", "Precio Web", "Valor", "PrecioPIM"]));
   }, 0);
-  var ticketActual = summary.pedidosVtexUnicos ? errorAmount / summary.pedidosVtexUnicos : 0;
+  var ticketActual = REFERENCE_TICKET_ACTUAL;
   var ticketError = summary.pedidosError ? errorAmount / summary.pedidosError : 0;
   var brecha = ticketActual - ticketError;
 
@@ -184,19 +190,23 @@ function buildHealth_(sheetResults) {
   };
 }
 
-function buildPaymentBreakdown_(rows) {
+function buildPaymentBreakdown_(rows, pedidosVtexError) {
   var groups = {};
+  var amountByOrder = buildAmountByOrder_(pedidosVtexError);
   rows.forEach(function(row) {
     var payment = getAny_(row, ["tipo_pago", "Payment System Name", "Medio de Pago"]) || "Sin dato";
+    var orderCore = getOrderCore_(getAny_(row, ["nro_pedido_canal", "Order", "Nro Pedido"]));
     var key = String(payment);
     if (!groups[key]) {
       groups[key] = {
         tipo: key,
         pedidos: 0,
+        monto: 0,
         gestion: MANUAL_PAYMENT_METHODS.indexOf(normalizeText_(key)) >= 0 ? "Manual" : "Automatica"
       };
     }
     groups[key].pedidos += 1;
+    groups[key].monto += amountByOrder[orderCore] || 0;
   });
 
   return Object.keys(groups).map(function(key) {
@@ -220,6 +230,29 @@ function buildHourlyError_(rows) {
   }).sort(function(a, b) {
     return Number(a.hora) - Number(b.hora);
   });
+}
+
+function filterVtexByPedidosError_(pedidosVtex, pedidosError) {
+  var errorOrders = {};
+  pedidosError.forEach(function(row) {
+    var core = getOrderCore_(getAny_(row, ["nro_pedido_canal", "Order", "Nro Pedido"]));
+    if (core) errorOrders[core] = true;
+  });
+
+  return pedidosVtex.filter(function(row) {
+    var core = getOrderCore_(getAny_(row, ["Order", "Nro Pedido", "nro_pedido_canal"]));
+    return !!errorOrders[core];
+  });
+}
+
+function buildAmountByOrder_(rows) {
+  var totals = {};
+  rows.forEach(function(row) {
+    var core = getOrderCore_(getAny_(row, ["Order", "Nro Pedido", "nro_pedido_canal"]));
+    if (!core) return;
+    totals[core] = (totals[core] || 0) + toNumber_(getAny_(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
+  });
+  return totals;
 }
 
 function buildSkuImpactFromVtex_(rows, limit) {
@@ -432,6 +465,14 @@ function getAny_(row, fields) {
     }
   }
   return "";
+}
+
+function getOrderCore_(value) {
+  var text = String(value || "").trim();
+  if (!text) return "";
+  var match = text.match(/-(\d+)-/);
+  if (match) return match[1];
+  return text.replace(/-01$/, "");
 }
 
 function normalizeStore_(value) {

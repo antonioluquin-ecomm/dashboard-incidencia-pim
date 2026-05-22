@@ -225,7 +225,8 @@
       kpi("Gestion manual", fmt(s.gestionManual), "MercadoPago Pro + GoCuotas", "orange"),
       kpi("Gestion automatica", fmt(s.gestionAutomatica), "Resto de medios de pago", "green"),
       kpi("Items PIM", fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems)), s.pedidosPimItems ? `${fmt(s.pedidosPimUnicos)} pedidos unicos` : "Referencia esperada", "blue"),
-      kpi("Items VTEX", fmt(s.pedidosVtexItems), s.pedidosVtexItems ? `${fmt(s.pedidosVtexUnicos)} pedidos unicos` : "Sin datos VTEX", "blue"),
+      kpi("Unidades rechazadas", fmt(s.unidadesRechazadas), "Lineas VTEX cruzadas con pedidos error", "orange"),
+      kpi("SKUs afectados", fmt(s.skusErrorUnicos), "SKU unicos en pedidos error", "orange"),
       kpi("Items a dar de baja", fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems)), s.bajaItems ? `${fmt(s.bajaPedidos)} pedidos unicos` : "Referencia esperada", "orange"),
       kpi("Despachados", fmt(s.despachados), "Accion logistica prioritaria", s.despachados ? "red" : "purple")
     ].join("");
@@ -234,12 +235,15 @@
   function renderFinancialKpis() {
     const f = state.financialImpact || {};
     $("#financialKpis").innerHTML = [
-      kpi("Monto rechazado", fmtMoney(f.montoRechazado), "Pedidos VTEX vinculados", "red"),
+      kpi("Monto rechazado", fmtMoney(f.montoRechazado), "Solo pedidos con error", "red"),
       kpi("Valor total PIM", fmtMoney(f.valorTotalPim), "Items ingresados a PIM", "blue"),
       kpi("Valor facturado", fmtMoney(f.valorFacturado), "Pedidos facturados", "green"),
       kpi("Importe cobrado error", fmtMoney(f.importeCobradoError), "Base dar de baja", "orange"),
       kpi("Diferencia vs correcto", fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto))), "Precio correcto - pagado", "red"),
+      kpi("Ticket prom. actual", fmtMoney(f.ticketPromedioActual), "Referencia analisis", "blue"),
       kpi("Ticket prom. error", fmtMoney(f.ticketPromedioError), "Monto rechazado / pedidos error", "purple"),
+      kpi("Brecha de error", fmtMoney(f.brechaTicket), "Actual - error", "red"),
+      kpi("Potencial perdida", fmtMoney(f.potencialPerdida), "Brecha x pedidos error", "red"),
       kpi("Precio prom. correcto", fmtMoney(f.precioPromedioCorrectoBaja), "Items de baja", "orange"),
       kpi("Precio prom. pagado", fmtMoney(f.precioPromedioPagadoBaja), "Items de baja", "red")
     ].join("");
@@ -382,7 +386,7 @@
     $("#pimKpis").innerHTML = [
       kpi("Items PIM", fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems)), s.pedidosPimItems ? "Desde Apps Script" : "Referencia esperada", "blue"),
       kpi("Pedidos PIM", fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), "Pedidos unicos", "blue"),
-      kpi("Items VTEX", fmt(s.pedidosVtexItems), `${fmt(s.pedidosVtexUnicos)} pedidos unicos`, "blue"),
+      kpi("Unidades rechazadas", fmt(s.unidadesRechazadas), "Pedidos con error", "orange"),
       kpi("Bajas", fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems)), `${fmt(valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos))} pedidos`, "orange"),
       kpi("Despachados", fmt(s.despachados), "Requiere seguimiento", s.despachados ? "red" : "purple"),
       kpi("Importe pagado", fmtMoney(s.importePagado), "Base bajas", "red"),
@@ -517,6 +521,9 @@
       pedidosPimUnicos: uniqueCount(pedidosPim, ["Nro Pedido", "nro_pedido_canal", "Nro pedido"]),
       pedidosVtexItems: pedidosVtex.length,
       pedidosVtexUnicos: uniqueCount(pedidosVtex, ["Order", "Nro Pedido", "nro_pedido_canal"]),
+      unidadesRechazadas: sumBy(pedidosVtex, ["Quantity_SKU", "Cantidad", "cantidad"]),
+      skusErrorUnicos: uniqueCount(pedidosVtex, ["Reference Code", "SKU", "Sku", "sku", "ID_SKU"]),
+      montoRechazado: sumBy(pedidosVtex, ["SKU Total Price", "Total Value", "Payment Value", "monto"]),
       bajaItems: darDeBaja.length,
       bajaPedidos: uniqueCount(darDeBaja, ["nro_pedido_canal", "Nro Pedido", "pedido"]),
       despachados: darDeBaja.filter(isDispatch).length,
@@ -531,7 +538,7 @@
     const valorFacturado = pedidosPim
       .filter((row) => normalizeText(getValue(row, ["Estado Actual", "estado"])) === "facturado")
       .reduce((total, row) => total + toNumber(getValue(row, ["PrecioWEB", "Precio Web", "Valor", "PrecioPIM"])), 0);
-    const ticketActual = summary.pedidosVtexUnicos ? montoRechazado / summary.pedidosVtexUnicos : 0;
+    const ticketActual = (cfg.referenceMetrics && cfg.referenceMetrics.ticketPromedioActual) || 135000;
     const ticketError = summary.pedidosError ? montoRechazado / summary.pedidosError : 0;
     const brecha = ticketActual - ticketError;
 

@@ -9,5 +9,8 @@ window.PIM_INCIDENT_CONFIG = {
     bajaItems: 55,
     bajaPedidos: 36
   },
+  referenceMetrics: {
+    ticketPromedioActual: 135000
+  },
   manualPaymentMethods: ["mercado_pago_pro", "gocuotas"]
 };

@@ -1,6 +1,7 @@
 const SHEETS = {
   pedidosError: ["pedidos_error", "Pedidos con Error", "1-Pedidos con Error"],
   pedidosPim: ["pedidos_pim", "Pedidos PIM"],
+  pedidosVtex: ["pedidos_vtex", "Pedidos VTEX", "Vtex Woker", "Vtex Sporting"],
   darDeBaja: ["dar_de_baja", "Dar de baja"],
   cronologia: ["cronologia", "Cronologia", "Cronología"],
   skuResumen: ["sku_resumen", "SKU resumen", "2-Análisis por SKU", "2-Analisis por SKU"]
@@ -12,6 +13,7 @@ function doGet() {
       updatedAt: new Date().toISOString(),
       pedidosError: readSheet_(SHEETS.pedidosError),
       pedidosPim: readSheet_(SHEETS.pedidosPim),
+      pedidosVtex: readSheet_(SHEETS.pedidosVtex),
       darDeBaja: readSheet_(SHEETS.darDeBaja),
       cronologia: readSheet_(SHEETS.cronologia),
       skuResumen: readSheet_(SHEETS.skuResumen)

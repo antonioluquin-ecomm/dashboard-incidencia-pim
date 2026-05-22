@@ -6,6 +6,7 @@
     raw: {
       pedidosError: [],
       pedidosPim: [],
+      pedidosVtex: [],
       darDeBaja: [],
       cronologia: [],
       skuResumen: []
@@ -55,6 +56,7 @@
 
       state.raw.pedidosError = normalizeRows(payload.pedidosError || []);
       state.raw.pedidosPim = normalizeRows(payload.pedidosPim || []);
+      state.raw.pedidosVtex = normalizeRows(payload.pedidosVtex || []);
       state.raw.darDeBaja = normalizeRows(payload.darDeBaja || []);
       state.raw.cronologia = normalizeRows(payload.cronologia || []);
       state.raw.skuResumen = normalizeRows(payload.skuResumen || []);
@@ -81,6 +83,7 @@
       sourceLabel: "CSV publicado",
       pedidosError: parseCsv(text),
       pedidosPim: [],
+      pedidosVtex: [],
       darDeBaja: [],
       cronologia: [],
       skuResumen: []
@@ -96,6 +99,7 @@
       sourceLabel: "Apps Script",
       pedidosError: payload.pedidosError || payload.pedidos_error || [],
       pedidosPim: payload.pedidosPim || payload.pedidos_pim || [],
+      pedidosVtex: payload.pedidosVtex || payload.pedidos_vtex || [],
       darDeBaja: payload.darDeBaja || payload.dar_de_baja || [],
       cronologia: payload.cronologia || [],
       skuResumen: payload.skuResumen || payload.sku_resumen || []
@@ -122,6 +126,7 @@
   function buildMetrics() {
     const pedidosError = state.raw.pedidosError;
     const pedidosPim = state.raw.pedidosPim;
+    const pedidosVtex = state.raw.pedidosVtex;
     const bajas = state.raw.darDeBaja;
     const paymentCounts = groupCount(pedidosError, getPayment);
     const totalError = pedidosError.length;
@@ -139,6 +144,8 @@
       expectedError: cfg.expectedTotals.pedidosError,
       pedidosPimItems: pedidosPim.length,
       pedidosPimUnicos: pimsUnicos,
+      pedidosVtexItems: pedidosVtex.length,
+      pedidosVtexUnicos: uniqueCount(pedidosVtex, ["Order", "Nro Pedido", "nro_pedido_canal"]),
       bajaItems: bajas.length,
       bajaPedidos,
       despachados,
@@ -156,6 +163,7 @@
     const connectedParts = [
       metrics.totalError ? "pedidos con error" : null,
       metrics.pedidosPimItems ? "PIM" : null,
+      metrics.pedidosVtexItems ? "VTEX" : null,
       metrics.bajaItems ? "bajas" : null
     ].filter(Boolean).join(", ");
 
@@ -170,6 +178,7 @@
       kpi("Gestion manual", fmt(metrics.manual), "MercadoPago Pro + GoCuotas", "orange"),
       kpi("Gestion automatica", fmt(metrics.automatico), "Resto de medios de pago", "green"),
       kpi("Items PIM", fmt(metrics.pedidosPimItems || cfg.expectedTotals.pedidosPimItems), metrics.pedidosPimItems ? `${fmt(metrics.pedidosPimUnicos)} pedidos unicos` : "Pendiente Apps Script", "blue"),
+      kpi("Items VTEX", fmt(metrics.pedidosVtexItems), metrics.pedidosVtexItems ? `${fmt(metrics.pedidosVtexUnicos)} pedidos unicos` : "Pendiente Apps Script", "blue"),
       kpi("Items a dar de baja", fmt(metrics.bajaItems || cfg.expectedTotals.bajaItems), metrics.bajaItems ? `${fmt(metrics.bajaPedidos)} pedidos unicos` : "Pendiente Apps Script", "orange"),
       kpi("Despachados", fmt(metrics.despachados), "Accion logistica prioritaria", metrics.despachados ? "red" : "purple")
     ].join("");
@@ -247,7 +256,7 @@
   }
 
   function renderSku() {
-    const rows = state.raw.skuResumen;
+    const rows = state.raw.skuResumen.length ? state.raw.skuResumen : buildSkuFromVtex();
     $("#skuEmpty").classList.toggle("hidden", rows.length > 0);
     $("#skuTableWrap").classList.toggle("hidden", rows.length === 0);
     $("#tbodySku").innerHTML = rows.map((row) => `
@@ -266,11 +275,49 @@
     $("#pimKpis").innerHTML = [
       kpi("Items PIM", fmt(metrics.pedidosPimItems || cfg.expectedTotals.pedidosPimItems), metrics.pedidosPimItems ? "Desde Apps Script" : "Referencia Excel", "blue"),
       kpi("Pedidos PIM", fmt(metrics.pedidosPimUnicos || cfg.expectedTotals.pedidosPimUnicos), "Pedidos unicos", "blue"),
+      kpi("Items VTEX", fmt(metrics.pedidosVtexItems), `${fmt(metrics.pedidosVtexUnicos)} pedidos unicos`, "blue"),
       kpi("Bajas", fmt(metrics.bajaItems || cfg.expectedTotals.bajaItems), `${fmt(metrics.bajaPedidos || cfg.expectedTotals.bajaPedidos)} pedidos`, "orange"),
       kpi("Despachados", fmt(metrics.despachados), "Requiere seguimiento", metrics.despachados ? "red" : "purple"),
       kpi("Importe pagado", fmtMoney(metrics.totalPagado), "Base bajas", "red"),
       kpi("Diferencia", fmtMoney(Math.abs(metrics.totalDiff)), "Monto a gestionar", "red")
     ].join("");
+  }
+
+  function buildSkuFromVtex() {
+    const grouped = new Map();
+    state.raw.pedidosVtex.forEach((row) => {
+      const sku = getValue(row, ["Reference Code", "SKU", "Sku", "sku", "ID_SKU"]);
+      if (!sku) return;
+
+      const order = getValue(row, ["Order", "Nro Pedido", "nro_pedido_canal"]);
+      const current = grouped.get(sku) || {
+        sku,
+        producto: getValue(row, ["SKU Name", "Producto", "producto"]),
+        sitios: new Set(),
+        pedidos: new Set(),
+        unidades: 0,
+        monto: 0
+      };
+
+      const seller = getValue(row, ["Seller Name", "Tienda", "Host"]);
+      if (seller) current.sitios.add(seller);
+      if (order) current.pedidos.add(order);
+      current.unidades += toNumber(getValue(row, ["Quantity_SKU", "Cantidad", "cantidad"])) || 1;
+      current.monto += toNumber(getValue(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
+      grouped.set(sku, current);
+    });
+
+    return Array.from(grouped.values())
+      .map((item) => ({
+        sku: item.sku,
+        producto: item.producto,
+        sitios: Array.from(item.sitios).join(", "),
+        pedidos: item.pedidos.size,
+        unidades: item.unidades,
+        monto: item.monto
+      }))
+      .sort((a, b) => b.pedidos - a.pedidos)
+      .slice(0, 200);
   }
 
   function renderBajas() {

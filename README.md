@@ -18,14 +18,13 @@ La version actual consume el CSV publicado en `config.js`.
 Para usar Apps Script:
 
 1. Crear o abrir el Google Sheet.
-2. Agregar estas pestanas, respetando encabezados en la primera fila:
+2. Agregar estas cuatro pestanas base, respetando encabezados en la primera fila:
    - `pedidos_error`
    - `pedidos_pim`
+   - `pedidos_vtex`
    - `dar_de_baja`
-   - `cronologia`
-   - `sku_resumen`
 
-El Apps Script tambien acepta algunos nombres alternativos del Excel, como `Pedidos con Error`, `Pedidos PIM` y `Dar de baja`.
+El Apps Script tambien acepta algunos nombres alternativos del Excel, como `Pedidos con Error`, `Pedidos PIM`, `Pedidos VTEX`, `Vtex Woker`, `Vtex Sporting` y `Dar de baja`.
 3. Abrir Extensiones > Apps Script.
 4. Pegar el contenido de `Code.gs`.
 5. Implementar como aplicacion web con acceso de lectura.
@@ -58,6 +57,20 @@ appScriptUrl: "URL_DE_APPS_SCRIPT"
 - `PrecioWEB`
 - `Estado Actual`
 
+`pedidos_vtex`:
+
+- `Order`
+- `Creation Date`
+- `Payment System Name`
+- `Quantity_SKU`
+- `Reference Code`
+- `SKU Name`
+- `SKU Selling Price`
+- `SKU Total Price`
+- `Total Value`
+- `Seller Name`
+- `Status`
+
 `dar_de_baja`:
 
 - `nro_pedido_canal`
@@ -69,6 +82,10 @@ appScriptUrl: "URL_DE_APPS_SCRIPT"
 - `diff$`
 - `Estado envio`
 - `nro_seguimiento`
+
+## Hojas opcionales
+
+No son obligatorias para iniciar. Se pueden agregar despues si queremos editar la narrativa sin tocar codigo.
 
 `cronologia`:
 

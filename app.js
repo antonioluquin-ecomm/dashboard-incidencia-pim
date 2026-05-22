@@ -87,11 +87,38 @@
     } catch (error) {
       $("#sourceStatus").textContent = "Sin conexion";
       $("#sourceStatus").className = "status-pill error";
-      showError("No se pudieron cargar los datos. " + error.message);
+      showError(classifyLoadError(error));
       renderAll();
     } finally {
       setLoading(false);
     }
+  }
+
+  function classifyLoadError(error) {
+    const msg = error.message || "";
+    if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("net::")) {
+      return "Sin conexión a internet o bloqueo CORS. Verificar red e intentar nuevamente.";
+    }
+    if (msg.startsWith("HTTP ")) {
+      const code = parseInt(msg.replace("HTTP ", ""), 10);
+      if (code === 401 || code === 403) {
+        return "Acceso denegado (HTTP " + code + "). Verificar que el Apps Script esté desplegado como 'Cualquier usuario'.";
+      }
+      if (code === 404) {
+        return "URL no encontrada (HTTP 404). Verificar appScriptUrl en config.js.";
+      }
+      if (code === 429 || code === 503) {
+        return "Apps Script temporalmente no disponible (HTTP " + code + "). Reintentar en unos minutos.";
+      }
+      if (code >= 500) {
+        return "Error interno en Apps Script (HTTP " + code + "). Revisar registros en el editor de Google Apps Script.";
+      }
+      return "Error HTTP " + code + ". " + msg;
+    }
+    if (msg.toLowerCase().includes("json") || msg.toLowerCase().includes("unexpected token")) {
+      return "La respuesta de Apps Script no es JSON válido. Verificar que el deploy esté activo y la URL sea correcta.";
+    }
+    return msg || "No se pudieron cargar los datos.";
   }
 
   async function fetchPublishedCsv() {

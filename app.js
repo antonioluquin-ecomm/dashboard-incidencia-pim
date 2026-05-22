@@ -10,7 +10,6 @@
     hourlyError: [],
     financialImpact: {},
     skuImpact: [],
-    skuAmbosSitios: [],
     bajasPrioritarias: [],
     cronologia: [],
     pedidosError: [],
@@ -113,7 +112,6 @@
       hourlyError: payload.hourlyError || [],
       financialImpact: payload.financialImpact || {},
       skuImpact: payload.skuImpact || [],
-      skuAmbosSitios: payload.skuAmbosSitios || [],
       bajasPrioritarias: payload.bajasPrioritarias || [],
       cronologia: payload.cronologia || []
     };
@@ -174,7 +172,6 @@
     state.hourlyError = payload.hourlyError || [];
     state.financialImpact = payload.financialImpact || {};
     state.skuImpact = payload.skuImpact || [];
-    state.skuAmbosSitios = payload.skuAmbosSitios || [];
     state.bajasPrioritarias = payload.bajasPrioritarias || [];
     state.cronologia = payload.cronologia || [];
     state.pedidosError = payload.pedidosError || [];
@@ -197,7 +194,6 @@
       hourlyError: buildHourlyError(pedidosError),
       financialImpact: buildFinancialImpact(pedidosError, pedidosPim, pedidosVtex, darDeBaja, summary),
       skuImpact: normalizeRows(payload.skuResumen || []).length ? normalizeSkuRows(payload.skuResumen) : buildSkuFromVtex(pedidosVtex),
-      skuAmbosSitios: buildSkuFromVtex(pedidosVtex).filter((item) => splitSites(item.sitios).length > 1).slice(0, 50),
       bajasPrioritarias: buildBajasPrioritarias(darDeBaja),
       cronologia: normalizeCronologia(payload.cronologia || []),
       pedidosError
@@ -217,7 +213,6 @@
     renderFinancialExplanation();
     renderPaymentBreakdown();
     renderStoreBreakdown();
-    renderSharedSkuPreview();
     renderHourChart();
     renderPedidosError();
     renderTimeline();
@@ -244,15 +239,15 @@
     $("#executiveStory").innerHTML = [
       {
         title: "Que paso",
-        text: `Se detectaron <strong>${fmt(s.pedidosError)}</strong> pedidos que no pudieron avanzar correctamente por problemas de precio y stock. Esos pedidos concentran <strong>${fmt(s.unidadesRechazadas)}</strong> unidades rechazadas.`
+        text: `El universo revisado combina <strong>${fmt(s.pedidosError)}</strong> pedidos que cayeron en error PIM y <strong>${fmt(s.pedidosPimUnicos)}</strong> pedidos que si ingresaron a PIM. En total son <strong>${fmt(s.pedidosTotalesIncidente)}</strong> pedidos bajo analisis.`
       },
       {
         title: "Donde impacta",
-        text: `El monto comercial asociado al incidente es de <strong>${fmtMoney(f.montoRechazado)}</strong>. La diferencia confirmada en pedidos a dar de baja es de <strong>${fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto)))}</strong>.`
+        text: `Dentro de PIM hay <strong>${fmt(s.pimConDiferenciaPedidos)}</strong> pedidos con diferencia de precio. De ellos, <strong>${fmt(s.bajaPorDiferenciaPedidos)}</strong> ya quedaron en baja y <strong>${fmt(s.expuestosConDiferenciaPedidos)}</strong> siguen expuestos o facturados.`
       },
       {
         title: "Que hacer primero",
-        text: `Priorizar <strong>${fmt(s.despachados)}</strong> items con envio o seguimiento y <strong>${fmt(s.gestionManual)}</strong> pedidos de gestion manual para reembolso o contacto operativo.`
+        text: `Priorizar los <strong>${fmt(s.facturadosConDiferenciaPedidos)}</strong> pedidos facturados con diferencia y los <strong>${fmt(s.gestionManual)}</strong> pedidos de error que requieren gestion manual.`
       }
     ].map((item) => `
       <article class="story-card">
@@ -300,14 +295,18 @@
   function renderSummaryKpis() {
     const s = state.summary;
     $("#summaryKpis").innerHTML = [
-      kpi("Pedidos con error", fmt(valueOr(s.pedidosError, cfg.expectedTotals.pedidosError)), "Pedidos que no avanzaron por stock/precio", "red"),
+      kpi("Total pedidos", fmt(s.pedidosTotalesIncidente), "Error PIM + pedidos ingresados a PIM", "purple"),
+      kpi("Pedidos con error", fmt(valueOr(s.pedidosError, cfg.expectedTotals.pedidosError)), "No ingresaron a PIM", "red"),
+      kpi("Pedidos ingresados PIM", fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), `${fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems))} items`, "blue"),
+      kpi("Ingresaron sin dif.", fmt(s.pedidosPimSinError), "Pedidos PIM sin diferencia de precio", "green"),
+      kpi("Bajas PIM", fmt(valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos)), `${fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems))} items en estado Baja`, "orange"),
+      kpi("Bajas por dif.", fmt(s.bajaPorDiferenciaPedidos), `${fmt(s.bajaPorDiferenciaItems)} items con precio incorrecto`, "orange"),
+      kpi("Facturados con dif.", fmt(s.facturadosConDiferenciaPedidos), "Pedidos que avanzaron con precio incorrecto", "red"),
+      kpi("Expuestos con dif.", fmt(s.expuestosConDiferenciaPedidos), "Activos, asignados, cola o facturados", "red"),
       kpi("Unidades rechazadas", fmt(s.unidadesRechazadas), "Unidades dentro de esos pedidos", "orange"),
       kpi("SKUs afectados", fmt(s.skusErrorUnicos), "Productos distintos involucrados", "orange"),
       kpi("Gestion manual", fmt(s.gestionManual), "Requieren accion humana", "orange"),
-      kpi("Gestion automatica", fmt(s.gestionAutomatica), "Se reprocesan o cancelan por sistema", "green"),
-      kpi("Pedidos PIM", fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), `${fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems))} items ingresados`, "blue"),
-      kpi("Items a dar de baja", fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems)), s.bajaItems ? `${fmt(s.bajaPedidos)} pedidos unicos` : "Referencia esperada", "orange"),
-      kpi("Items despachados", fmt(s.despachados), "No se pueden dar de baja sin accion logistica", s.despachados ? "red" : "purple")
+      kpi("Gestion automatica", fmt(s.gestionAutomatica), "Se reprocesan o cancelan por sistema", "green")
     ].join("");
   }
 
@@ -317,8 +316,9 @@
       kpi("Monto rechazado", fmtMoney(f.montoRechazado), "Solo pedidos con error", "red"),
       kpi("Valor total PIM", fmtMoney(f.valorTotalPim), "Items ingresados a PIM", "blue"),
       kpi("Valor facturado", fmtMoney(f.valorFacturado), "Pedidos facturados", "green"),
-      kpi("Importe cobrado error", fmtMoney(f.importeCobradoError), "Base dar de baja", "orange"),
-      kpi("Diferencia vs correcto", fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto))), "Precio correcto - pagado", "red"),
+      kpi("Importe con dif.", fmtMoney(f.importeCobradoError), "Items PIM con diferencia", "orange"),
+      kpi("Diferencia detectada", fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto))), "Precio PIM - precio WEB", "red"),
+      kpi("Perdida expuesta", fmtMoney(f.perdidaReal), "Diferencia no contenida en Baja", "red"),
       kpi("Ticket normal ref.", fmtMoney(f.ticketPromedioActual), "Ticket promedio habitual usado como referencia", "blue"),
       kpi("Ticket del incidente", fmtMoney(f.ticketPromedioError), "Monto rechazado / pedidos con error", "purple"),
       kpi("Brecha de error", fmtMoney(f.brechaTicket), "Actual - error", "red"),
@@ -332,10 +332,10 @@
     const f = state.financialImpact || {};
     $("#financialExplanation").innerHTML = `
       <strong>Lectura financiera:</strong>
-      los pedidos afectados representan ${fmtMoney(f.montoRechazado)} de venta rechazada.
+      los pedidos que cayeron en error representan ${fmtMoney(f.montoRechazado)} de venta rechazada.
       El ticket del incidente fue de ${fmtMoney(f.ticketPromedioError)}, contra un ticket normal de referencia de ${fmtMoney(f.ticketPromedioActual)}.
       Esa brecha explica un potencial de perdida estimado de ${fmtMoney(f.potencialPerdida)}.
-      En paralelo, los pedidos a dar de baja ya tienen una diferencia confirmada de ${fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto)))}.`;
+      En los pedidos que si ingresaron a PIM, la diferencia detectada suma ${fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto)))} y la perdida expuesta fuera de estado Baja es ${fmtMoney(f.perdidaReal)}.`;
   }
 
   function renderPaymentBreakdown() {
@@ -373,21 +373,6 @@
         <div class="td-right td-mono">${fmtMoney(row.monto)}</div>
       </div>
     `).join("") : `<p class="section-note">Sin datos de tienda disponibles.</p>`;
-  }
-
-  function renderSharedSkuPreview() {
-    const rows = (state.skuAmbosSitios || []).slice(0, 6);
-    $("#sharedSkuPreview").innerHTML = rows.length ? rows.map((row) => `
-      <div class="mini-sku-row">
-        <div>
-          <div class="mini-title">${escapeHtml(row.producto || row.sku)}</div>
-          <div class="mini-sub">${escapeHtml(row.sku)} - ${escapeHtml(row.sitios || "Ambos")}</div>
-        </div>
-        <div class="td-right td-mono">${fmt(row.pedidos)}</div>
-        <div class="td-right td-mono">${fmt(row.unidades)}</div>
-        <div class="td-right td-mono">${fmtMoney(row.monto)}</div>
-      </div>
-    `).join("") : `<p class="section-note">No se detectaron SKUs compartidos entre sitios.</p>`;
   }
 
   function renderHourChart() {
@@ -454,20 +439,8 @@
 
   function renderSku() {
     const rows = state.skuImpact || [];
-    const sharedRows = state.skuAmbosSitios || [];
     $("#skuEmpty").classList.toggle("hidden", rows.length > 0);
     $("#skuTableWrap").classList.toggle("hidden", rows.length === 0);
-    $("#sharedSkuTableWrap").classList.toggle("hidden", sharedRows.length === 0);
-    $("#tbodySharedSku").innerHTML = sharedRows.map((row) => `
-      <tr>
-        <td class="td-mono">${escapeHtml(row.sku)}</td>
-        <td>${escapeHtml(row.producto)}</td>
-        <td>${escapeHtml(row.sitios)}</td>
-        <td class="td-right td-mono">${fmt(row.pedidos)}</td>
-        <td class="td-right td-mono">${fmt(row.unidades)}</td>
-        <td class="td-right td-mono">${fmtMoney(row.monto)}</td>
-      </tr>
-    `).join("");
     $("#tbodySku").innerHTML = rows.map((row) => `
       <tr>
         <td class="td-mono">${escapeHtml(row.sku)}</td>
@@ -485,11 +458,13 @@
     $("#pimKpis").innerHTML = [
       kpi("Items PIM", fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems)), s.pedidosPimItems ? "Desde Apps Script" : "Referencia esperada", "blue"),
       kpi("Pedidos PIM", fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), "Pedidos unicos", "blue"),
-      kpi("Unidades rechazadas", fmt(s.unidadesRechazadas), "Pedidos con error", "orange"),
-      kpi("Bajas", fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems)), `${fmt(valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos))} pedidos`, "orange"),
-      kpi("Despachados", fmt(s.despachados), "Requiere seguimiento", s.despachados ? "red" : "purple"),
-      kpi("Importe pagado", fmtMoney(s.importePagado), "Base bajas", "red"),
-      kpi("Diferencia", fmtMoney(Math.abs(toNumber(s.diferenciaTotal))), "Monto a gestionar", "red")
+      kpi("Pedidos sin dif.", fmt(s.pedidosPimSinError), "Ingresaron sin diferencia de precio", "green"),
+      kpi("Pedidos con dif.", fmt(s.pimConDiferenciaPedidos), `${fmt(s.pimConDiferenciaItems)} items`, "red"),
+      kpi("Bajas PIM", fmt(valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos)), `${fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems))} items`, "orange"),
+      kpi("Baja por dif.", fmt(s.bajaPorDiferenciaPedidos), `${fmt(s.bajaPorDiferenciaItems)} items`, "orange"),
+      kpi("Baja normal", fmt(s.bajaNormalPedidos), `${fmt(s.bajaNormalItems)} items`, "blue"),
+      kpi("Facturados con dif.", fmt(s.facturadosConDiferenciaPedidos), "Perdida confirmada/expuesta", "red"),
+      kpi("Perdida expuesta", fmtMoney(s.perdidaReal), "Diferencia fuera de Baja", "red")
     ].join("");
   }
 
@@ -510,8 +485,8 @@
           <td class="td-right td-mono">${fmtMoney(row.importe_pagado)}</td>
           <td class="td-right td-mono">${fmtMoney(row.precio_actual)}</td>
           <td class="td-right td-mono">${fmtMoney(row.diff)}</td>
-          <td><span class="badge ${dispatch ? "badge-red" : "badge-green"}">${dispatch ? "Con envio" : "Sin envio"}</span></td>
-          <td class="td-mono">${escapeHtml(row.nro_seguimiento || "-")}</td>
+          <td><span class="badge ${dispatch ? "badge-red" : normalizeText(row.estado_pim) === "baja" ? "badge-green" : "badge-orange"}">${escapeHtml(row.estado_pim || row.estado_envio || "-")}</span></td>
+          <td>${escapeHtml(row.tipo_baja || "-")}</td>
           <td><span class="badge ${priorityClass(row.prioridad)}">${escapeHtml(row.prioridad || "Media")}</span></td>
         </tr>`;
     }).join("") : emptyRow(10, "No hay bajas para mostrar con los filtros actuales.");
@@ -612,22 +587,37 @@
 
   function buildLegacySummary(pedidosError, pedidosPim, pedidosVtex, darDeBaja) {
     const manual = pedidosError.filter((row) => manualPayments.has(normalizeText(getPayment(row)))).length;
+    const pedidosPimUnicos = uniqueCount(pedidosPim, ["Nro Pedido", "nro_pedido_canal", "Nro pedido"]);
+    const bajasPedidos = uniqueCount(darDeBaja, ["nro_pedido_canal", "Nro Pedido", "pedido"]);
     return {
+      pedidosTotalesIncidente: pedidosError.length + pedidosPimUnicos,
       pedidosError: pedidosError.length,
       gestionManual: manual,
       gestionAutomatica: Math.max(0, pedidosError.length - manual),
       pedidosPimItems: pedidosPim.length,
-      pedidosPimUnicos: uniqueCount(pedidosPim, ["Nro Pedido", "nro_pedido_canal", "Nro pedido"]),
+      pedidosPimUnicos,
+      pedidosPimSinError: pedidosPimUnicos,
       pedidosVtexItems: pedidosVtex.length,
       pedidosVtexUnicos: uniqueCount(pedidosVtex, ["Order", "Nro Pedido", "nro_pedido_canal"]),
       unidadesRechazadas: sumBy(pedidosVtex, ["Quantity_SKU", "Cantidad", "cantidad"]),
       skusErrorUnicos: uniqueCount(pedidosVtex, ["Reference Code", "SKU", "Sku", "sku", "ID_SKU"]),
       montoRechazado: sumBy(pedidosVtex, ["SKU Total Price", "Total Value", "Payment Value", "monto"]),
       bajaItems: darDeBaja.length,
-      bajaPedidos: uniqueCount(darDeBaja, ["nro_pedido_canal", "Nro Pedido", "pedido"]),
+      bajaPedidos: bajasPedidos,
+      bajaPorDiferenciaItems: darDeBaja.length,
+      bajaPorDiferenciaPedidos: bajasPedidos,
+      bajaNormalItems: 0,
+      bajaNormalPedidos: 0,
+      pimConDiferenciaItems: darDeBaja.length,
+      pimConDiferenciaPedidos: bajasPedidos,
+      facturadosConDiferenciaItems: darDeBaja.filter(isDispatch).length,
+      facturadosConDiferenciaPedidos: 0,
+      expuestosConDiferenciaItems: darDeBaja.filter(isDispatch).length,
+      expuestosConDiferenciaPedidos: 0,
       despachados: darDeBaja.filter(isDispatch).length,
       importePagado: sumBy(darDeBaja, ["importe_pagado", "Importe Pagado", "pagado"]),
-      diferenciaTotal: sumBy(darDeBaja, ["diff$", "Diff", "diff"])
+      diferenciaTotal: sumBy(darDeBaja, ["diff$", "Diff", "diff"]),
+      perdidaReal: Math.abs(sumBy(darDeBaja.filter(isDispatch), ["diff$", "Diff", "diff"]))
     };
   }
 
@@ -651,8 +641,9 @@
       ticketPromedioError: ticketError,
       brechaTicket: brecha,
       potencialPerdida: Math.abs(brecha) * summary.pedidosError,
-      precioPromedioCorrectoBaja: summary.bajaItems ? (summary.importePagado + Math.abs(summary.diferenciaTotal)) / summary.bajaItems : 0,
-      precioPromedioPagadoBaja: summary.bajaItems ? summary.importePagado / summary.bajaItems : 0
+      perdidaReal: summary.perdidaReal || 0,
+      precioPromedioCorrectoBaja: summary.pimConDiferenciaItems ? (summary.importePagado + Math.abs(summary.diferenciaTotal)) / summary.pimConDiferenciaItems : 0,
+      precioPromedioPagadoBaja: summary.pimConDiferenciaItems ? summary.importePagado / summary.pimConDiferenciaItems : 0
     };
   }
 
@@ -664,8 +655,7 @@
       sheets: {
         pedidos_error: { name: "pedidos_error", found: pedidosError.length > 0, rows: pedidosError.length, missingColumns: [] },
         pedidos_pim: { name: "pedidos_pim", found: pedidosPim.length > 0, rows: pedidosPim.length, missingColumns: [] },
-        pedidos_vtex: { name: "pedidos_vtex", found: pedidosVtex.length > 0, rows: pedidosVtex.length, missingColumns: [] },
-        dar_de_baja: { name: "dar_de_baja", found: darDeBaja.length > 0, rows: darDeBaja.length, missingColumns: [] }
+        pedidos_vtex: { name: "pedidos_vtex", found: pedidosVtex.length > 0, rows: pedidosVtex.length, missingColumns: [] }
       }
     };
   }
@@ -854,8 +844,8 @@
   function isDispatch(row) {
     if (row.despachado === true) return true;
     const seguimiento = getValue(row, ["nro_seguimiento", "Seguimiento"]);
-    const estado = normalizeText(getValue(row, ["estado_envio", "Estado envio"]));
-    return Boolean(seguimiento) || ["a", "d", "despachado"].includes(estado);
+    const estado = normalizeText(getValue(row, ["estado_pim", "estado_envio", "Estado envio", "Estado"]));
+    return Boolean(seguimiento) || ["a", "d", "despachado", "facturado"].includes(estado);
   }
 
   function getValue(row, fields) {
@@ -874,6 +864,7 @@
     if (!text) return 0;
     if (text.includes(",") && text.includes(".")) text = text.replace(/\./g, "").replace(",", ".");
     else if (text.includes(",")) text = text.replace(",", ".");
+    else if ((text.match(/\./g) || []).length > 1) text = text.replace(/\./g, "");
     const number = Number(text);
     return Number.isFinite(number) ? number : 0;
   }
@@ -914,7 +905,6 @@
       pedidos_error: "Pedidos error",
       pedidos_pim: "PIM",
       pedidos_vtex: "VTEX",
-      dar_de_baja: "Bajas"
     }[key] || key;
   }
 

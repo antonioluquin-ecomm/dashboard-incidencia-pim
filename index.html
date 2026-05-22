@@ -74,7 +74,7 @@
         <article class="panel">
           <div class="panel-header">
             <h3>4. Pico horario</h3>
-            <span>Hora real</span>
+            <span>Solo pedidos con error</span>
           </div>
           <div class="hour-chart" id="hourChart"></div>
         </article>
@@ -87,14 +87,6 @@
             <span>Pedidos, unidades y monto</span>
           </div>
           <div id="storeBreakdown"></div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-header">
-            <h3>6. SKU en ambos sitios</h3>
-            <span>Top compartidos</span>
-          </div>
-          <div id="sharedSkuPreview"></div>
         </article>
       </div>
     </section>
@@ -167,7 +159,7 @@
           <p class="eyebrow">Productos afectados</p>
           <h2>Analisis por SKU</h2>
         </div>
-        <p class="section-note">Ranking calculado desde VTEX o desde una hoja opcional de resumen SKU. No expone datos personales.</p>
+        <p class="section-note">Ranking calculado desde los pedidos VTEX que cayeron en error. El monto sale de la suma de precio total del SKU en esos pedidos.</p>
       </div>
 
       <div class="empty-state" id="skuEmpty">
@@ -176,28 +168,8 @@
       </div>
 
       <div class="section-subhead">
-        <h3>SKUs presentes en ambos sitios</h3>
-        <span>Catálogo compartido afectado</span>
-      </div>
-      <div class="table-wrap hidden" id="sharedSkuTableWrap">
-        <table>
-          <thead>
-            <tr>
-              <th>SKU</th>
-              <th>Producto</th>
-              <th>Sitios</th>
-              <th class="td-right">Pedidos</th>
-              <th class="td-right">Unidades</th>
-              <th class="td-right">Monto</th>
-            </tr>
-          </thead>
-          <tbody id="tbodySharedSku"></tbody>
-        </table>
-      </div>
-
-      <div class="section-subhead">
         <h3>Ranking general SKU</h3>
-        <span>Top por pedidos</span>
+        <span>Monto = suma del precio total VTEX de pedidos con error</span>
       </div>
       <div class="table-wrap hidden" id="skuTableWrap">
         <table>
@@ -222,14 +194,14 @@
           <p class="eyebrow">Gestion PIM</p>
           <h2>PIM y bajas</h2>
         </div>
-        <p class="section-note">Prioriza pedidos a dar de baja y marca envios con seguimiento para accion logistica.</p>
+        <p class="section-note">Las bajas se toman desde <strong>pedidos_pim</strong>. Se separan bajas normales, bajas por diferencia de precio y pedidos que siguieron activos o facturados con diferencia.</p>
       </div>
 
       <div class="kpi-grid" id="pimKpis"></div>
 
       <div class="toolbar">
-        <input class="search-input" id="searchBajas" type="search" placeholder="Buscar pedido, SKU, producto o seguimiento">
-        <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-dispatch="true">Despachados</button>
+        <input class="search-input" id="searchBajas" type="search" placeholder="Buscar pedido, SKU, producto o estado">
+        <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-dispatch="true">Facturados con diferencia</button>
         <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-clear="true">Limpiar</button>
         <span class="row-count" id="countBajas"></span>
       </div>
@@ -245,8 +217,8 @@
               <th class="td-right">Pagado</th>
               <th class="td-right">Precio actual</th>
               <th class="td-right">Diff</th>
-              <th>Envio</th>
-              <th>Seguimiento</th>
+              <th>Estado PIM</th>
+              <th>Tipo</th>
               <th>Prioridad</th>
             </tr>
           </thead>

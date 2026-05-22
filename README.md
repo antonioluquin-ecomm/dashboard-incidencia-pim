@@ -18,13 +18,14 @@ La version actual consume Apps Script en `config.js`. La API debe devolver datos
 Para usar Apps Script:
 
 1. Crear o abrir el Google Sheet.
-2. Agregar estas cuatro pestanas base, respetando encabezados en la primera fila:
+2. Agregar estas tres pestanas base, respetando encabezados en la primera fila:
    - `pedidos_error`
    - `pedidos_pim`
    - `pedidos_vtex`
-   - `dar_de_baja`
 
-El Apps Script tambien acepta algunos nombres alternativos del Excel, como `Pedidos con Error`, `Pedidos PIM`, `Pedidos VTEX`, `Vtex Woker`, `Vtex Sporting` y `Dar de baja`.
+Las bajas se calculan desde `pedidos_pim`, usando los items en estado `Baja` y comparando `PrecioWEB` contra `PrecioPIM` para separar baja normal vs baja por diferencia de precio.
+
+El Apps Script tambien acepta algunos nombres alternativos del Excel, como `Pedidos con Error`, `Pedidos PIM`, `Pedidos VTEX`, `Vtex Woker` y `Vtex Sporting`.
 3. Abrir Extensiones > Apps Script.
 4. Pegar el contenido de `Code.gs`.
 5. Configurar la clave para la vista protegida:
@@ -75,18 +76,6 @@ appScriptUrl: "URL_DE_APPS_SCRIPT"
 - `Seller Name`
 - `Status`
 
-`dar_de_baja`:
-
-- `nro_pedido_canal`
-- `sku`
-- `producto`
-- `cantidad`
-- `importe_pagado`
-- `precio_actual`
-- `diff$`
-- `Estado envio`
-- `nro_seguimiento`
-
 ## Contrato seguro de Apps Script
 
 `Code.gs` devuelve:
@@ -98,8 +87,18 @@ appScriptUrl: "URL_DE_APPS_SCRIPT"
 - `hourlyError`: pedidos con error por hora real.
 - `financialImpact`: montos, tickets promedio y diferencias.
 - `skuImpact`: ranking SKU calculado sin datos personales.
-- `skuAmbosSitios`: SKUs detectados en mas de un sitio.
-- `bajasPrioritarias`: columnas operativas seguras para gestionar bajas.
+- `bajasPrioritarias`: columnas operativas seguras calculadas desde `pedidos_pim`.
+
+`summary` diferencia:
+
+- pedidos con error que no ingresaron a PIM;
+- pedidos que si ingresaron a PIM;
+- pedidos PIM sin diferencia de precio;
+- pedidos PIM con diferencia de precio;
+- bajas normales;
+- bajas por diferencia de precio;
+- pedidos facturados o expuestos con diferencia;
+- perdida expuesta fuera de estado `Baja`.
 
 No se exponen emails, telefonos, documentos, direcciones ni nombres de clientes.
 

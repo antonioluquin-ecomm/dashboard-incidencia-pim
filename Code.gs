@@ -2,14 +2,12 @@ const CACHE_KEY = "pim_incident_dashboard_v3";
 const CACHE_TTL_SECONDS = 300;
 const HIGH_DIFF_THRESHOLD = 100000;
 const SKU_IMPACT_LIMIT = 120;
-const SHARED_SKU_LIMIT = 50;
 const REFERENCE_TICKET_ACTUAL = 135000;
 
 const SHEETS = {
   pedidosError: ["pedidos_error", "Pedidos con Error", "1-Pedidos con Error"],
   pedidosPim: ["pedidos_pim", "Pedidos PIM"],
   pedidosVtex: ["pedidos_vtex", "Pedidos VTEX", "Vtex Woker", "Vtex Sporting"],
-  darDeBaja: ["dar_de_baja", "Dar de baja"],
   cronologia: ["cronologia", "Cronologia", "Cronología"],
   skuResumen: ["sku_resumen", "SKU resumen", "2-Análisis por SKU", "2-Analisis por SKU"]
 };
@@ -17,8 +15,7 @@ const SHEETS = {
 const REQUIRED_COLUMNS = {
   pedidosError: ["fecha_alta", "nro_pedido_canal", "tipo_pago", "Hora real"],
   pedidosPim: ["Nro Pedido", "Tienda", "Sku", "Producto", "Cantidad", "Estado Actual"],
-  pedidosVtex: ["Order", "Reference Code", "SKU Name", "Quantity_SKU", "Seller Name"],
-  darDeBaja: ["nro_pedido_canal", "sku", "producto", "cantidad", "importe_pagado", "precio_actual", "diff$", "Estado envio", "nro_seguimiento"]
+  pedidosVtex: ["Order", "Reference Code", "SKU Name", "Quantity_SKU", "Seller Name"]
 };
 
 const MANUAL_PAYMENT_METHODS = ["mercado_pago_pro", "gocuotas"];
@@ -102,13 +99,12 @@ function buildPayload_() {
   var pedidosError = readSheet_(SHEETS.pedidosError, REQUIRED_COLUMNS.pedidosError);
   var pedidosPim = readSheet_(SHEETS.pedidosPim, REQUIRED_COLUMNS.pedidosPim);
   var pedidosVtex = readSheet_(SHEETS.pedidosVtex, REQUIRED_COLUMNS.pedidosVtex);
-  var darDeBaja = readSheet_(SHEETS.darDeBaja, REQUIRED_COLUMNS.darDeBaja);
   var cronologia = readSheet_(SHEETS.cronologia, []);
   var skuResumen = readSheet_(SHEETS.skuResumen, []);
   var pedidosVtexError = filterVtexByPedidosError_(pedidosVtex.rows, pedidosError.rows);
 
-  var summary = buildSummary_(pedidosError.rows, pedidosPim.rows, pedidosVtex.rows, pedidosVtexError, darDeBaja.rows);
-  var health = buildHealth_([pedidosError, pedidosPim, pedidosVtex, darDeBaja]);
+  var summary = buildSummary_(pedidosError.rows, pedidosPim.rows, pedidosVtex.rows, pedidosVtexError);
+  var health = buildHealth_([pedidosError, pedidosPim, pedidosVtex]);
 
   return {
     updatedAt: new Date().toISOString(),
@@ -117,50 +113,61 @@ function buildPayload_() {
     paymentBreakdown: buildPaymentBreakdown_(pedidosError.rows, pedidosVtexError),
     storeBreakdown: buildStoreBreakdown_(pedidosVtexError),
     hourlyError: buildHourlyError_(pedidosError.rows),
-    financialImpact: buildFinancialImpact_(pedidosError.rows, pedidosPim.rows, pedidosVtexError, darDeBaja.rows, summary),
+    financialImpact: buildFinancialImpact_(pedidosError.rows, pedidosPim.rows, pedidosVtexError, summary),
     skuImpact: skuResumen.rows.length ? buildSkuImpactFromSummary_(skuResumen.rows) : buildSkuImpactFromVtex_(pedidosVtexError),
-    skuAmbosSitios: buildSkuAmbosSitios_(pedidosVtexError),
-    bajasPrioritarias: buildBajasPrioritarias_(darDeBaja.rows),
+    bajasPrioritarias: buildBajasPrioritariasFromPim_(pedidosPim.rows),
     cronologia: buildCronologia_(cronologia.rows)
   };
 }
 
-function buildSummary_(pedidosError, pedidosPim, pedidosVtex, pedidosVtexError, darDeBaja) {
+function buildSummary_(pedidosError, pedidosPim, pedidosVtex, pedidosVtexError) {
   var manual = pedidosError.filter(function(row) {
     return MANUAL_PAYMENT_METHODS.indexOf(normalizeText_(getAny_(row, ["tipo_pago", "Payment System Name", "Medio de Pago"]))) >= 0;
   }).length;
-  var despachados = darDeBaja.filter(hasDispatch_).length;
   var pedidoPimIds = uniqueValues_(pedidosPim, ["Nro Pedido", "nro_pedido_canal", "Nro pedido"]);
   var pedidoVtexIds = uniqueValues_(pedidosVtex, ["Order", "Nro Pedido", "nro_pedido_canal"]);
-  var bajaPedidoIds = uniqueValues_(darDeBaja, ["nro_pedido_canal", "Nro Pedido", "pedido"]);
   var errorSkuIds = uniqueValues_(pedidosVtexError, ["Reference Code", "SKU", "Sku", "sku", "ID_SKU"]);
+  var pimMetrics = buildPimPriceMetrics_(pedidosPim);
 
   return {
+    pedidosTotalesIncidente: pedidosError.length + pedidoPimIds.length,
     pedidosError: pedidosError.length,
     gestionManual: manual,
     gestionAutomatica: Math.max(0, pedidosError.length - manual),
     pedidosPimItems: pedidosPim.length,
     pedidosPimUnicos: pedidoPimIds.length,
+    pedidosPimSinError: Math.max(0, pedidoPimIds.length - pimMetrics.pedidosConDiferencia),
     pedidosVtexItems: pedidosVtex.length,
     pedidosVtexUnicos: pedidoVtexIds.length,
     unidadesRechazadas: sumRows_(pedidosVtexError, ["Quantity_SKU", "Cantidad", "cantidad"]),
     skusErrorUnicos: errorSkuIds.length,
     montoRechazado: sumRows_(pedidosVtexError, ["SKU Total Price", "Total Value", "Payment Value", "monto"]),
-    bajaItems: darDeBaja.length,
-    bajaPedidos: bajaPedidoIds.length,
-    despachados: despachados,
-    importePagado: sumRows_(darDeBaja, ["importe_pagado", "Importe Pagado", "pagado"]),
-    diferenciaTotal: sumRows_(darDeBaja, ["diff$", "Diff", "diff"])
+    bajaItems: pimMetrics.bajaItems,
+    bajaPedidos: pimMetrics.bajaPedidos,
+    bajaPorDiferenciaItems: pimMetrics.bajaPorDiferenciaItems,
+    bajaPorDiferenciaPedidos: pimMetrics.bajaPorDiferenciaPedidos,
+    bajaNormalItems: pimMetrics.bajaNormalItems,
+    bajaNormalPedidos: pimMetrics.bajaNormalPedidos,
+    pimConDiferenciaItems: pimMetrics.itemsConDiferencia,
+    pimConDiferenciaPedidos: pimMetrics.pedidosConDiferencia,
+    facturadosConDiferenciaItems: pimMetrics.facturadosConDiferenciaItems,
+    facturadosConDiferenciaPedidos: pimMetrics.facturadosConDiferenciaPedidos,
+    expuestosConDiferenciaItems: pimMetrics.expuestosConDiferenciaItems,
+    expuestosConDiferenciaPedidos: pimMetrics.expuestosConDiferenciaPedidos,
+    importePagado: pimMetrics.importePagadoDiferencia,
+    diferenciaTotal: pimMetrics.diferenciaTotal,
+    perdidaReal: pimMetrics.perdidaReal,
+    despachados: pimMetrics.facturadosConDiferenciaItems
   };
 }
 
-function buildFinancialImpact_(pedidosError, pedidosPim, pedidosVtexError, darDeBaja, summary) {
+function buildFinancialImpact_(pedidosError, pedidosPim, pedidosVtexError, summary) {
   var errorAmount = summary.montoRechazado || sumRows_(pedidosVtexError, ["SKU Total Price", "Total Value", "Payment Value", "monto"]);
-  var pimValue = sumRows_(pedidosPim, ["PrecioWEB", "Precio Web", "Valor", "PrecioPIM"]);
+  var pimValue = sumRows_(pedidosPim, ["PrecioWEB", "Precio WEB", "Precio Web", "Valor", "PrecioPIM", "Precio PIM"]);
   var facturadoValue = pedidosPim.filter(function(row) {
-    return normalizeText_(getAny_(row, ["Estado Actual", "estado"])) === "facturado";
+    return normalizeText_(getAny_(row, ["Estado Actual", "Estado", "estado"])) === "facturado";
   }).reduce(function(total, row) {
-    return total + toNumber_(getAny_(row, ["PrecioWEB", "Precio Web", "Valor", "PrecioPIM"]));
+    return total + toNumber_(getAny_(row, ["PrecioWEB", "Precio WEB", "Precio Web", "Valor", "PrecioPIM", "Precio PIM"]));
   }, 0);
   var ticketActual = REFERENCE_TICKET_ACTUAL;
   var ticketError = summary.pedidosError ? errorAmount / summary.pedidosError : 0;
@@ -172,12 +179,13 @@ function buildFinancialImpact_(pedidosError, pedidosPim, pedidosVtexError, darDe
     valorFacturado: facturadoValue,
     importeCobradoError: summary.importePagado,
     diferenciaPrecioCorrecto: summary.diferenciaTotal,
+    perdidaReal: summary.perdidaReal,
     ticketPromedioActual: ticketActual,
     ticketPromedioError: ticketError,
     brechaTicket: brecha,
     potencialPerdida: Math.abs(brecha) * summary.pedidosError,
-    precioPromedioCorrectoBaja: summary.bajaItems ? (summary.importePagado + Math.abs(summary.diferenciaTotal)) / summary.bajaItems : 0,
-    precioPromedioPagadoBaja: summary.bajaItems ? summary.importePagado / summary.bajaItems : 0
+    precioPromedioCorrectoBaja: summary.pimConDiferenciaItems ? (summary.importePagado + Math.abs(summary.diferenciaTotal)) / summary.pimConDiferenciaItems : 0,
+    precioPromedioPagadoBaja: summary.pimConDiferenciaItems ? summary.importePagado / summary.pimConDiferenciaItems : 0
   };
 }
 
@@ -361,17 +369,6 @@ function buildSkuImpactFromVtex_(rows, limit) {
   }).slice(0, limit || SKU_IMPACT_LIMIT);
 }
 
-function buildSkuAmbosSitios_(rows) {
-  return buildSkuImpactFromVtex_(rows, rows.length).filter(function(item) {
-    var sitios = String(item.sitios || "").split(",").map(function(site) {
-      return normalizeStore_(site);
-    }).filter(function(site, index, array) {
-      return site && array.indexOf(site) === index;
-    });
-    return sitios.length > 1;
-  }).slice(0, SHARED_SKU_LIMIT);
-}
-
 function buildSkuImpactFromSummary_(rows) {
   return rows.map(function(row) {
     return {
@@ -389,26 +386,104 @@ function buildSkuImpactFromSummary_(rows) {
   }).slice(0, 200);
 }
 
-function buildBajasPrioritarias_(rows) {
-  return rows.map(function(row) {
-    var diff = toNumber_(getAny_(row, ["diff$", "Diff", "diff"]));
-    var estadoEnvio = getAny_(row, ["Estado envio", "estado_envio"]);
-    var seguimiento = getAny_(row, ["nro_seguimiento", "Seguimiento"]);
-    var despachado = hasDispatch_(row);
-    var prioridad = despachado ? "Urgente" : Math.abs(diff) >= HIGH_DIFF_THRESHOLD ? "Alta" : "Media";
+function buildPimPriceMetrics_(rows) {
+  var orderSets = {
+    baja: {},
+    bajaDiff: {},
+    bajaNormal: {},
+    conDiff: {},
+    factDiff: {},
+    expuestoDiff: {}
+  };
+  var metrics = {
+    bajaItems: 0,
+    bajaPedidos: 0,
+    bajaPorDiferenciaItems: 0,
+    bajaPorDiferenciaPedidos: 0,
+    bajaNormalItems: 0,
+    bajaNormalPedidos: 0,
+    itemsConDiferencia: 0,
+    pedidosConDiferencia: 0,
+    facturadosConDiferenciaItems: 0,
+    facturadosConDiferenciaPedidos: 0,
+    expuestosConDiferenciaItems: 0,
+    expuestosConDiferenciaPedidos: 0,
+    importePagadoDiferencia: 0,
+    diferenciaTotal: 0,
+    perdidaReal: 0
+  };
+
+  rows.forEach(function(row) {
+    var order = getPimOrder_(row);
+    var estado = getPimEstado_(row);
+    var diff = getPimPriceDiff_(row);
+    var hasDiff = hasPimPriceDiff_(row);
+    var baja = isBajaEstado_(estado);
+    var facturado = isFacturadoEstado_(estado);
+
+    if (baja) {
+      metrics.bajaItems += 1;
+      if (order) orderSets.baja[order] = true;
+    }
+
+    if (hasDiff) {
+      metrics.itemsConDiferencia += 1;
+      metrics.importePagadoDiferencia += getPimPaidPrice_(row);
+      metrics.diferenciaTotal += diff;
+      if (order) orderSets.conDiff[order] = true;
+
+      if (baja) {
+        metrics.bajaPorDiferenciaItems += 1;
+        if (order) orderSets.bajaDiff[order] = true;
+      } else {
+        metrics.expuestosConDiferenciaItems += 1;
+        metrics.perdidaReal += Math.abs(diff);
+        if (order) orderSets.expuestoDiff[order] = true;
+      }
+
+      if (facturado) {
+        metrics.facturadosConDiferenciaItems += 1;
+        if (order) orderSets.factDiff[order] = true;
+      }
+    } else if (baja) {
+      metrics.bajaNormalItems += 1;
+      if (order) orderSets.bajaNormal[order] = true;
+    }
+  });
+
+  metrics.bajaPedidos = Object.keys(orderSets.baja).length;
+  metrics.bajaPorDiferenciaPedidos = Object.keys(orderSets.bajaDiff).length;
+  metrics.bajaNormalPedidos = Object.keys(orderSets.bajaNormal).length;
+  metrics.pedidosConDiferencia = Object.keys(orderSets.conDiff).length;
+  metrics.facturadosConDiferenciaPedidos = Object.keys(orderSets.factDiff).length;
+  metrics.expuestosConDiferenciaPedidos = Object.keys(orderSets.expuestoDiff).length;
+  return metrics;
+}
+
+function buildBajasPrioritariasFromPim_(rows) {
+  return rows.filter(function(row) {
+    return isBajaEstado_(getPimEstado_(row)) || hasPimPriceDiff_(row);
+  }).map(function(row) {
+    var diff = getPimPriceDiff_(row);
+    var estado = getPimEstado_(row);
+    var baja = isBajaEstado_(estado);
+    var facturado = isFacturadoEstado_(estado);
+    var prioridad = facturado ? "Urgente" : Math.abs(diff) >= HIGH_DIFF_THRESHOLD ? "Alta" : baja ? "Media" : "Alta";
 
     return {
-      nro_pedido_canal: getAny_(row, ["nro_pedido_canal", "Nro Pedido"]),
-      sku: getAny_(row, ["sku", "SKU"]),
-      producto: getAny_(row, ["producto", "Producto"]),
-      cantidad: toNumber_(getAny_(row, ["cantidad", "Cantidad"])),
-      importe_pagado: toNumber_(getAny_(row, ["importe_pagado", "Importe Pagado"])),
-      precio_actual: toNumber_(getAny_(row, ["precio_actual", "Precio Actual"])),
+      nro_pedido_canal: getPimOrder_(row),
+      sku: getAny_(row, ["sku", "SKU", "Sku", "Reference Code"]),
+      producto: getAny_(row, ["producto", "Producto", "SKU Name"]),
+      cantidad: toNumber_(getAny_(row, ["cantidad", "Cantidad", "Cant.", "Cant", "Quantity_SKU"])) || 1,
+      importe_pagado: getPimPaidPrice_(row),
+      precio_actual: getPimCorrectPrice_(row),
       diff: diff,
-      estado_envio: estadoEnvio,
-      nro_seguimiento: seguimiento,
+      estado_envio: estado,
+      nro_seguimiento: "",
       prioridad: prioridad,
-      despachado: despachado
+      despachado: facturado,
+      estado_pim: estado,
+      tipo_baja: baja && hasPimPriceDiff_(row) ? "Baja por diferencia" : baja ? "Baja normal" : "Diferencia activa"
     };
   }).sort(function(a, b) {
     var order = { Urgente: 0, Alta: 1, Media: 2 };
@@ -426,6 +501,47 @@ function buildCronologia_(rows) {
   }).filter(function(row) {
     return row.hora || row.titulo || row.descripcion;
   });
+}
+
+function getPimOrder_(row) {
+  return getAny_(row, ["Nro Pedido", "nro_pedido_canal", "Nro pedido", "Order"]);
+}
+
+function getPimEstado_(row) {
+  return getAny_(row, ["Estado Actual", "Estado", "estado"]);
+}
+
+function getPimPaidPrice_(row) {
+  return toNumber_(getAny_(row, ["PrecioWEB", "Precio WEB", "Precio Web", "Imp. Pagado", "Importe Pagado", "importe_pagado"]));
+}
+
+function getPimCorrectPrice_(row) {
+  return toNumber_(getAny_(row, ["PrecioPIM", "Precio PIM", "Precio Correcto", "precio_actual", "Precio Actual"]));
+}
+
+function getPimPriceDiff_(row) {
+  var explicit = getAny_(row, ["diff$", "Diff $", "Diff", "diff"]);
+  if (explicit !== "") return toNumber_(explicit);
+  var paid = getPimPaidPrice_(row);
+  var correct = getPimCorrectPrice_(row);
+  if (!paid || !correct) return 0;
+  return paid - correct;
+}
+
+function hasPimPriceDiff_(row) {
+  var paid = getPimPaidPrice_(row);
+  var correct = getPimCorrectPrice_(row);
+  var diff = getPimPriceDiff_(row);
+  return paid > 0 && correct > 0 && Math.abs(diff) > 0.01;
+}
+
+function isBajaEstado_(estado) {
+  return normalizeText_(estado) === "baja";
+}
+
+function isFacturadoEstado_(estado) {
+  var value = normalizeText_(estado);
+  return value === "facturado" || value.indexOf("despach") >= 0;
 }
 
 function readSheet_(sheetNames, requiredColumns) {
@@ -560,6 +676,8 @@ function toNumber_(value) {
     text = text.replace(/\./g, "").replace(",", ".");
   } else if (text.indexOf(",") >= 0) {
     text = text.replace(",", ".");
+  } else if ((text.match(/\./g) || []).length > 1) {
+    text = text.replace(/\./g, "");
   }
 
   var number = Number(text);

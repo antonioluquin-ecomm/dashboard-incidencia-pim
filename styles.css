@@ -138,13 +138,16 @@ h1 {
 }
 
 .icon-button {
-  width: 34px;
+  min-width: 82px;
   height: 34px;
+  padding: 0 10px;
   border: 1px solid rgba(245,165,36,.45);
   border-radius: 6px;
   background: rgba(245,165,36,.1);
   color: var(--orange);
   cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .nav-tabs {
@@ -276,6 +279,44 @@ h1 {
   display: grid;
   grid-template-columns: minmax(320px, .9fr) minmax(420px, 1.3fr);
   gap: 16px;
+}
+
+.health-panel {
+  margin-bottom: 24px;
+  box-shadow: none;
+}
+
+.health-grid,
+.health-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 90px 120px minmax(180px, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.health-head {
+  padding: 0 0 8px;
+  color: var(--quiet);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.health-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.health-row strong,
+.health-row span {
+  display: block;
+}
+
+.health-row span,
+.health-missing {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .panel {
@@ -566,6 +607,11 @@ tr.flagged td {
   }
 
   .breakdown-row {
+    grid-template-columns: 1fr;
+  }
+
+  .health-grid,
+  .health-row {
     grid-template-columns: 1fr;
   }
 }

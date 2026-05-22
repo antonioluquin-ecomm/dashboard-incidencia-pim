@@ -20,7 +20,7 @@
     <div class="header-actions">
       <span class="status-pill" id="sourceStatus">Conectando</span>
       <span class="last-update" id="lastUpdate">Sin actualizar</span>
-      <button class="icon-button" id="refreshButton" type="button" title="Actualizar datos">↻</button>
+      <button class="icon-button" id="refreshButton" type="button" title="Actualizar datos">Actualizar</button>
     </div>
   </header>
 
@@ -41,10 +41,11 @@
           <p class="eyebrow">Vista ejecutiva</p>
           <h2>Que paso y donde mirar primero</h2>
         </div>
-        <p class="section-note">Los indicadores se recalculan desde la base conectada. Si el Sheet solo trae una pestaña, el tablero muestra esa capa y marca el resto como pendiente.</p>
+        <p class="section-note">Los indicadores se recalculan desde la base conectada. La API devuelve agregados seguros, sin datos personales ni filas VTEX completas.</p>
       </div>
 
       <div class="risk-strip" id="riskStrip"></div>
+      <div id="dataHealth"></div>
       <div class="kpi-grid" id="summaryKpis"></div>
 
       <div class="dashboard-grid">
@@ -72,7 +73,7 @@
           <p class="eyebrow">Pedidos rechazados</p>
           <h2>Pedidos con error</h2>
         </div>
-        <p class="section-note">Base orientada a pedidos que no ingresaron a PIM. Permite ubicar medio de pago, horario y numero de pedido.</p>
+        <p class="section-note">Base orientada a pedidos que no ingresaron a PIM. En modo seguro, esta vista prioriza agregados y evita exponer datos personales.</p>
       </div>
 
       <div class="toolbar">
@@ -106,7 +107,7 @@
           <p class="eyebrow">Seguimiento</p>
           <h2>Cronologia del incidente</h2>
         </div>
-        <p class="section-note">Esta seccion queda lista para cargarse desde una hoja llamada <strong>cronologia</strong> en Apps Script.</p>
+        <p class="section-note">Esta seccion puede alimentarse desde una hoja opcional llamada <strong>cronologia</strong> en Apps Script.</p>
       </div>
 
       <div class="timeline" id="timeline"></div>
@@ -118,12 +119,12 @@
           <p class="eyebrow">Productos afectados</p>
           <h2>Analisis por SKU</h2>
         </div>
-        <p class="section-note">Cuando el Apps Script exponga la hoja de SKU, esta tabla mostrara productos compartidos, unidades y monto afectado.</p>
+        <p class="section-note">Ranking calculado desde VTEX o desde una hoja opcional de resumen SKU. No expone datos personales.</p>
       </div>
 
       <div class="empty-state" id="skuEmpty">
-        <h3>Pendiente de conectar hoja SKU</h3>
-        <p>Agregar una pestana <strong>sku_resumen</strong> o consolidar SKU en el Apps Script para habilitar esta vista.</p>
+        <h3>Sin ranking SKU disponible</h3>
+        <p>Revisar que la hoja <strong>pedidos_vtex</strong> tenga SKU, producto, cantidad y pedido.</p>
       </div>
       <div class="table-wrap hidden" id="skuTableWrap">
         <table>
@@ -155,7 +156,7 @@
 
       <div class="toolbar">
         <input class="search-input" id="searchBajas" type="search" placeholder="Buscar pedido, SKU, producto o seguimiento">
-        <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-field="Estado envio" data-filter-value="A">Despachados</button>
+        <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-dispatch="true">Despachados</button>
         <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-clear="true">Limpiar</button>
         <span class="row-count" id="countBajas"></span>
       </div>
@@ -173,6 +174,7 @@
               <th class="td-right">Diff</th>
               <th>Envio</th>
               <th>Seguimiento</th>
+              <th>Prioridad</th>
             </tr>
           </thead>
           <tbody id="tbodyBajas"></tbody>

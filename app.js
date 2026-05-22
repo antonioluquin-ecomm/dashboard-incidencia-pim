@@ -3,17 +3,17 @@
   const manualPayments = new Set((cfg.manualPaymentMethods || []).map(normalizeText));
 
   const state = {
-    raw: {
-      pedidosError: [],
-      pedidosPim: [],
-      pedidosVtex: [],
-      darDeBaja: [],
-      cronologia: [],
-      skuResumen: []
-    },
+    summary: {},
+    health: null,
+    paymentBreakdown: [],
+    hourlyError: [],
+    skuImpact: [],
+    bajasPrioritarias: [],
+    cronologia: [],
+    pedidosError: [],
     filters: {
       errores: { search: "", field: null, value: null, page: 1, perPage: 50 },
-      bajas: { search: "", field: null, value: null, page: 1, perPage: 25 }
+      bajas: { search: "", dispatchOnly: false, page: 1, perPage: 25 }
     }
   };
 
@@ -26,7 +26,7 @@
   });
 
   function bindUi() {
-    $("#refreshButton").addEventListener("click", loadData);
+    $("#refreshButton").addEventListener("click", () => loadData({ refresh: true }));
     $$(".nav-tab").forEach((btn) => {
       btn.addEventListener("click", () => showTab(btn.dataset.tab));
     });
@@ -45,22 +45,16 @@
     });
   }
 
-  async function loadData() {
+  async function loadData(options = {}) {
     setLoading(true);
     clearError();
 
     try {
       const payload = cfg.dataMode === "appsScript" && cfg.appScriptUrl
-        ? await fetchAppsScript()
+        ? await fetchAppsScript(options)
         : await fetchPublishedCsv();
 
-      state.raw.pedidosError = normalizeRows(payload.pedidosError || []);
-      state.raw.pedidosPim = normalizeRows(payload.pedidosPim || []);
-      state.raw.pedidosVtex = normalizeRows(payload.pedidosVtex || []);
-      state.raw.darDeBaja = normalizeRows(payload.darDeBaja || []);
-      state.raw.cronologia = normalizeRows(payload.cronologia || []);
-      state.raw.skuResumen = normalizeRows(payload.skuResumen || []);
-
+      applyPayload(payload);
       $("#sourceStatus").textContent = payload.sourceLabel || "Datos cargados";
       $("#sourceStatus").className = "status-pill ok";
       $("#lastUpdate").textContent = new Date().toLocaleString("es-AR");
@@ -78,31 +72,70 @@
   async function fetchPublishedCsv() {
     const response = await fetch(cfg.csvUrl + cacheBust(cfg.csvUrl), { cache: "no-store" });
     if (!response.ok) throw new Error("HTTP " + response.status);
-    const text = await response.text();
-    return {
+    const pedidosError = parseCsv(await response.text());
+    return normalizeLegacyPayload({
       sourceLabel: "CSV publicado",
-      pedidosError: parseCsv(text),
+      pedidosError,
       pedidosPim: [],
       pedidosVtex: [],
       darDeBaja: [],
       cronologia: [],
       skuResumen: []
-    };
+    });
   }
 
-  async function fetchAppsScript() {
-    const response = await fetch(cfg.appScriptUrl + cacheBust(cfg.appScriptUrl), { cache: "no-store" });
+  async function fetchAppsScript(options) {
+    const url = cfg.appScriptUrl + cacheBust(cfg.appScriptUrl) + (options.refresh ? "&refresh=1" : "");
+    const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) throw new Error("HTTP " + response.status);
     const payload = await response.json();
     if (payload.error) throw new Error(payload.error);
+
+    if (!payload.summary) {
+      throw new Error("La API de Apps Script todavia usa el contrato anterior. Pegar y desplegar el Code.gs actualizado.");
+    }
+
     return {
       sourceLabel: "Apps Script",
-      pedidosError: payload.pedidosError || payload.pedidos_error || [],
-      pedidosPim: payload.pedidosPim || payload.pedidos_pim || [],
-      pedidosVtex: payload.pedidosVtex || payload.pedidos_vtex || [],
-      darDeBaja: payload.darDeBaja || payload.dar_de_baja || [],
-      cronologia: payload.cronologia || [],
-      skuResumen: payload.skuResumen || payload.sku_resumen || []
+      updatedAt: payload.updatedAt,
+      health: payload.health,
+      summary: payload.summary,
+      paymentBreakdown: payload.paymentBreakdown || [],
+      hourlyError: payload.hourlyError || [],
+      skuImpact: payload.skuImpact || [],
+      bajasPrioritarias: payload.bajasPrioritarias || [],
+      cronologia: payload.cronologia || []
+    };
+  }
+
+  function applyPayload(payload) {
+    state.summary = payload.summary || {};
+    state.health = payload.health || null;
+    state.paymentBreakdown = payload.paymentBreakdown || [];
+    state.hourlyError = payload.hourlyError || [];
+    state.skuImpact = payload.skuImpact || [];
+    state.bajasPrioritarias = payload.bajasPrioritarias || [];
+    state.cronologia = payload.cronologia || [];
+    state.pedidosError = payload.pedidosError || [];
+  }
+
+  function normalizeLegacyPayload(payload) {
+    const pedidosError = normalizeRows(payload.pedidosError || []);
+    const pedidosPim = normalizeRows(payload.pedidosPim || []);
+    const pedidosVtex = normalizeRows(payload.pedidosVtex || []);
+    const darDeBaja = normalizeRows(payload.darDeBaja || []);
+    const summary = buildLegacySummary(pedidosError, pedidosPim, pedidosVtex, darDeBaja);
+
+    return {
+      sourceLabel: payload.sourceLabel,
+      summary,
+      health: buildLegacyHealth(pedidosError, pedidosPim, pedidosVtex, darDeBaja),
+      paymentBreakdown: buildPaymentBreakdown(pedidosError),
+      hourlyError: buildHourlyError(pedidosError),
+      skuImpact: normalizeRows(payload.skuResumen || []).length ? normalizeSkuRows(payload.skuResumen) : buildSkuFromVtex(pedidosVtex),
+      bajasPrioritarias: buildBajasPrioritarias(darDeBaja),
+      cronologia: normalizeCronologia(payload.cronologia || []),
+      pedidosError
     };
   }
 
@@ -111,121 +144,122 @@
   }
 
   function renderAll() {
-    const metrics = buildMetrics();
-    renderRiskStrip(metrics);
-    renderSummaryKpis(metrics);
-    renderPaymentBreakdown(metrics);
-    renderHourChart(metrics);
+    renderRiskStrip();
+    renderHealth();
+    renderSummaryKpis();
+    renderPaymentBreakdown();
+    renderHourChart();
     renderPedidosError();
     renderTimeline();
     renderSku();
-    renderPimKpis(metrics);
+    renderPimKpis();
     renderBajas();
   }
 
-  function buildMetrics() {
-    const pedidosError = state.raw.pedidosError;
-    const pedidosPim = state.raw.pedidosPim;
-    const pedidosVtex = state.raw.pedidosVtex;
-    const bajas = state.raw.darDeBaja;
-    const paymentCounts = groupCount(pedidosError, getPayment);
-    const totalError = pedidosError.length;
-    const manual = pedidosError.filter((row) => manualPayments.has(normalizeText(getPayment(row)))).length;
-    const automatico = Math.max(0, totalError - manual);
-    const hourCounts = groupCount(pedidosError, getRealHour);
-    const pimsUnicos = uniqueCount(pedidosPim, ["Nro Pedido", "nro_pedido_canal", "Nro pedido"]);
-    const bajaPedidos = uniqueCount(bajas, ["nro_pedido_canal", "Nro Pedido", "pedido"]);
-    const despachados = bajas.filter((row) => hasDispatch(row)).length;
-    const totalPagado = sumBy(bajas, ["importe_pagado", "Importe Pagado", "pagado"]);
-    const totalDiff = sumBy(bajas, ["diff$", "Diff", "diff"]);
+  function renderRiskStrip() {
+    const health = state.health;
+    const parts = health && health.sheets
+      ? Object.entries(health.sheets).filter(([, info]) => info.found && info.rows).map(([key]) => sheetLabel(key))
+      : [];
+    const warning = health && health.status === "warning";
 
-    return {
-      totalError,
-      expectedError: cfg.expectedTotals.pedidosError,
-      pedidosPimItems: pedidosPim.length,
-      pedidosPimUnicos: pimsUnicos,
-      pedidosVtexItems: pedidosVtex.length,
-      pedidosVtexUnicos: uniqueCount(pedidosVtex, ["Order", "Nro Pedido", "nro_pedido_canal"]),
-      bajaItems: bajas.length,
-      bajaPedidos,
-      despachados,
-      totalPagado,
-      totalDiff,
-      manual,
-      automatico,
-      paymentCounts,
-      hourCounts
-    };
+    $("#riskStrip").innerHTML = warning
+      ? `<strong>Base con alertas:</strong> revisar columnas faltantes en Estado de datos. El tablero sigue mostrando lo disponible.`
+      : `<strong>Base conectada:</strong> ${parts.join(", ") || "sin datos visibles todavia"}. Actualizar el Google Sheet refresca este tablero.`;
   }
 
-  function renderRiskStrip(metrics) {
-    const hasPartialSheet = metrics.totalError > 0 && metrics.totalError < cfg.expectedTotals.pedidosError;
-    const connectedParts = [
-      metrics.totalError ? "pedidos con error" : null,
-      metrics.pedidosPimItems ? "PIM" : null,
-      metrics.pedidosVtexItems ? "VTEX" : null,
-      metrics.bajaItems ? "bajas" : null
-    ].filter(Boolean).join(", ");
+  function renderHealth() {
+    const health = state.health;
+    const container = $("#dataHealth");
+    if (!health || !health.sheets) {
+      container.innerHTML = `<div class="empty-state"><h3>Estado de datos no disponible</h3><p>La API no envio informacion de salud de la base.</p></div>`;
+      return;
+    }
 
-    $("#riskStrip").innerHTML = hasPartialSheet
-      ? `<strong>Base parcial conectada:</strong> se cargaron ${fmt(metrics.totalError)} pedidos (${connectedParts || "CSV publicado"}). El Excel de referencia indica ${fmt(cfg.expectedTotals.pedidosError)} pedidos con error. Para el tablero completo, publicar las pestañas por Apps Script.`
-      : `<strong>Base conectada:</strong> ${connectedParts || "sin datos visibles todavia"}. Actualizar el Google Sheet refresca este tablero.`;
+    const sheets = Object.entries(health.sheets).map(([key, info]) => {
+      const missing = info.missingColumns || [];
+      return `
+        <div class="health-row">
+          <div>
+            <strong>${sheetLabel(key)}</strong>
+            <span>${escapeHtml(info.name || key)}</span>
+          </div>
+          <div class="td-right td-mono">${fmt(info.rows || 0)}</div>
+          <div><span class="badge ${info.found && !missing.length ? "badge-green" : "badge-orange"}">${info.found ? "Conectada" : "Faltante"}</span></div>
+          <div class="health-missing">${missing.length ? escapeHtml(missing.join(", ")) : "OK"}</div>
+        </div>`;
+    }).join("");
+
+    container.innerHTML = `
+      <article class="panel health-panel">
+        <div class="panel-header">
+          <h3>Estado de datos</h3>
+          <span>Cache ${escapeHtml(health.cacheStatus || "-")} · TTL ${fmt(health.ttlSeconds || 0)}s</span>
+        </div>
+        <div class="health-grid health-head">
+          <span>Hoja</span><span>Filas</span><span>Estado</span><span>Columnas faltantes</span>
+        </div>
+        ${sheets}
+      </article>`;
   }
 
-  function renderSummaryKpis(metrics) {
+  function renderSummaryKpis() {
+    const s = state.summary;
     $("#summaryKpis").innerHTML = [
-      kpi("Pedidos con error", fmt(metrics.totalError || metrics.expectedError), metrics.totalError ? "Cargados desde la base" : "Total esperado por Excel", "red"),
-      kpi("Gestion manual", fmt(metrics.manual), "MercadoPago Pro + GoCuotas", "orange"),
-      kpi("Gestion automatica", fmt(metrics.automatico), "Resto de medios de pago", "green"),
-      kpi("Items PIM", fmt(metrics.pedidosPimItems || cfg.expectedTotals.pedidosPimItems), metrics.pedidosPimItems ? `${fmt(metrics.pedidosPimUnicos)} pedidos unicos` : "Pendiente Apps Script", "blue"),
-      kpi("Items VTEX", fmt(metrics.pedidosVtexItems), metrics.pedidosVtexItems ? `${fmt(metrics.pedidosVtexUnicos)} pedidos unicos` : "Pendiente Apps Script", "blue"),
-      kpi("Items a dar de baja", fmt(metrics.bajaItems || cfg.expectedTotals.bajaItems), metrics.bajaItems ? `${fmt(metrics.bajaPedidos)} pedidos unicos` : "Pendiente Apps Script", "orange"),
-      kpi("Despachados", fmt(metrics.despachados), "Accion logistica prioritaria", metrics.despachados ? "red" : "purple")
+      kpi("Pedidos con error", fmt(valueOr(s.pedidosError, cfg.expectedTotals.pedidosError)), s.pedidosError ? "Cargados desde la base" : "Referencia esperada", "red"),
+      kpi("Gestion manual", fmt(s.gestionManual), "MercadoPago Pro + GoCuotas", "orange"),
+      kpi("Gestion automatica", fmt(s.gestionAutomatica), "Resto de medios de pago", "green"),
+      kpi("Items PIM", fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems)), s.pedidosPimItems ? `${fmt(s.pedidosPimUnicos)} pedidos unicos` : "Referencia esperada", "blue"),
+      kpi("Items VTEX", fmt(s.pedidosVtexItems), s.pedidosVtexItems ? `${fmt(s.pedidosVtexUnicos)} pedidos unicos` : "Sin datos VTEX", "blue"),
+      kpi("Items a dar de baja", fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems)), s.bajaItems ? `${fmt(s.bajaPedidos)} pedidos unicos` : "Referencia esperada", "orange"),
+      kpi("Despachados", fmt(s.despachados), "Accion logistica prioritaria", s.despachados ? "red" : "purple")
     ].join("");
   }
 
-  function renderPaymentBreakdown(metrics) {
-    const entries = Object.entries(metrics.paymentCounts).sort((a, b) => b[1] - a[1]);
-    const max = Math.max(...entries.map(([, count]) => count), 1);
-    $("#paymentBreakdown").innerHTML = entries.length ? entries.map(([name, count]) => {
-      const manual = manualPayments.has(normalizeText(name));
+  function renderPaymentBreakdown() {
+    const entries = state.paymentBreakdown || [];
+    const total = state.summary.pedidosError || entries.reduce((sum, row) => sum + toNumber(row.pedidos), 0);
+    const max = Math.max(...entries.map((row) => toNumber(row.pedidos)), 1);
+
+    $("#paymentBreakdown").innerHTML = entries.length ? entries.map((row) => {
+      const count = toNumber(row.pedidos);
+      const manual = normalizeText(row.gestion) === "manual" || manualPayments.has(normalizeText(row.tipo));
       return `
         <div class="breakdown-row">
           <div>
-            <strong>${escapeHtml(name || "Sin dato")}</strong><br>
-            <span class="badge ${manual ? "badge-orange" : "badge-green"}">${manual ? "Manual" : "Automatico"}</span>
+            <strong>${escapeHtml(row.tipo || "Sin dato")}</strong><br>
+            <span class="badge ${manual ? "badge-orange" : "badge-green"}">${manual ? "Manual" : "Automatica"}</span>
           </div>
           <div class="bar-track"><div class="bar-fill" style="width:${Math.round(count / max * 100)}%;background:${manual ? "var(--orange)" : "var(--green)"}"></div></div>
           <div class="td-right td-mono">${fmt(count)}</div>
-          <div class="td-right td-mono">${pct(count, metrics.totalError)}</div>
+          <div class="td-right td-mono">${pct(count, total)}</div>
         </div>`;
     }).join("") : `<p class="section-note">Sin medios de pago cargados.</p>`;
   }
 
-  function renderHourChart(metrics) {
-    const entries = Object.entries(metrics.hourCounts)
-      .filter(([hour]) => hour !== "")
-      .sort((a, b) => Number(a[0]) - Number(b[0]));
-    const max = Math.max(...entries.map(([, count]) => count), 1);
+  function renderHourChart() {
+    const entries = (state.hourlyError || []).filter((row) => row.hora !== "");
+    const max = Math.max(...entries.map((row) => toNumber(row.pedidos)), 1);
 
-    $("#hourChart").innerHTML = entries.length ? entries.map(([hour, count]) => {
+    $("#hourChart").innerHTML = entries.length ? entries.map((row) => {
+      const count = toNumber(row.pedidos);
       const height = Math.max(5, Math.round(count / max * 126));
       const peak = count === max;
       return `
-        <div class="hour-item" title="${hour}:00 - ${count} pedidos">
+        <div class="hour-item" title="${escapeHtml(formatHour(row.hora))} - ${fmt(count)} pedidos">
           <div class="hour-value">${count >= 10 ? fmt(count) : ""}</div>
           <div class="hour-bar" style="height:${height}px;background:${peak ? "var(--red)" : "var(--blue)"}"></div>
-          <div class="hour-label">${String(hour).padStart(2, "0")}:00</div>
+          <div class="hour-label">${formatHour(row.hora)}</div>
         </div>`;
     }).join("") : `<p class="section-note">La base actual no trae hora real suficiente para graficar.</p>`;
   }
 
   function renderPedidosError() {
     const filter = state.filters.errores;
-    const rows = applyFilter(state.raw.pedidosError, filter);
+    const rows = applyFilter(state.pedidosError || [], filter);
     const page = paginate(rows, filter);
 
-    $("#countErrores").textContent = `${fmt(rows.length)} pedidos`;
+    $("#countErrores").textContent = rows.length ? `${fmt(rows.length)} pedidos` : `${fmt(state.summary.pedidosError || 0)} pedidos`;
     $("#tbodyErrores").innerHTML = page.length ? page.map((row) => {
       const payment = getPayment(row);
       const manual = manualPayments.has(normalizeText(payment));
@@ -237,13 +271,13 @@
           <td class="td-mono">${formatHour(getRealHour(row))}</td>
           <td><span class="badge ${manual ? "badge-orange" : "badge-green"}">${manual ? "Manual" : "Automatica"}</span></td>
         </tr>`;
-    }).join("") : emptyRow(5, "No hay pedidos con error para mostrar.");
+    }).join("") : emptyRow(5, "La API segura no expone filas completas de pedidos con error. Usar los agregados del resumen.");
 
     renderPager("#pagerErrores", rows.length, filter, renderPedidosError);
   }
 
   function renderTimeline() {
-    const rows = state.raw.cronologia.length ? state.raw.cronologia : defaultTimeline();
+    const rows = state.cronologia.length ? state.cronologia : defaultTimeline();
     $("#timeline").innerHTML = rows.map((row) => `
       <article class="timeline-item">
         <div class="timeline-time">${escapeHtml(getValue(row, ["hora", "Hora"]) || "Pendiente")}</div>
@@ -256,91 +290,56 @@
   }
 
   function renderSku() {
-    const rows = state.raw.skuResumen.length ? state.raw.skuResumen : buildSkuFromVtex();
+    const rows = state.skuImpact || [];
     $("#skuEmpty").classList.toggle("hidden", rows.length > 0);
     $("#skuTableWrap").classList.toggle("hidden", rows.length === 0);
     $("#tbodySku").innerHTML = rows.map((row) => `
       <tr>
-        <td class="td-mono">${escapeHtml(getValue(row, ["sku", "SKU", "Reference Code"]))}</td>
-        <td>${escapeHtml(getValue(row, ["producto", "Producto", "SKU Name"]))}</td>
-        <td>${escapeHtml(getValue(row, ["sitios", "Sitios", "Tienda"]))}</td>
-        <td class="td-right td-mono">${fmtNumberValue(getValue(row, ["pedidos", "Pedidos"]))}</td>
-        <td class="td-right td-mono">${fmtNumberValue(getValue(row, ["unidades", "Unidades", "Cantidad"]))}</td>
-        <td class="td-right td-mono">${fmtMoney(toNumber(getValue(row, ["monto", "Monto", "Total Value"])))}</td>
+        <td class="td-mono">${escapeHtml(row.sku)}</td>
+        <td>${escapeHtml(row.producto)}</td>
+        <td>${escapeHtml(row.sitios)}</td>
+        <td class="td-right td-mono">${fmt(row.pedidos)}</td>
+        <td class="td-right td-mono">${fmt(row.unidades)}</td>
+        <td class="td-right td-mono">${fmtMoney(row.monto)}</td>
       </tr>
     `).join("");
   }
 
-  function renderPimKpis(metrics) {
+  function renderPimKpis() {
+    const s = state.summary;
     $("#pimKpis").innerHTML = [
-      kpi("Items PIM", fmt(metrics.pedidosPimItems || cfg.expectedTotals.pedidosPimItems), metrics.pedidosPimItems ? "Desde Apps Script" : "Referencia Excel", "blue"),
-      kpi("Pedidos PIM", fmt(metrics.pedidosPimUnicos || cfg.expectedTotals.pedidosPimUnicos), "Pedidos unicos", "blue"),
-      kpi("Items VTEX", fmt(metrics.pedidosVtexItems), `${fmt(metrics.pedidosVtexUnicos)} pedidos unicos`, "blue"),
-      kpi("Bajas", fmt(metrics.bajaItems || cfg.expectedTotals.bajaItems), `${fmt(metrics.bajaPedidos || cfg.expectedTotals.bajaPedidos)} pedidos`, "orange"),
-      kpi("Despachados", fmt(metrics.despachados), "Requiere seguimiento", metrics.despachados ? "red" : "purple"),
-      kpi("Importe pagado", fmtMoney(metrics.totalPagado), "Base bajas", "red"),
-      kpi("Diferencia", fmtMoney(Math.abs(metrics.totalDiff)), "Monto a gestionar", "red")
+      kpi("Items PIM", fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems)), s.pedidosPimItems ? "Desde Apps Script" : "Referencia esperada", "blue"),
+      kpi("Pedidos PIM", fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), "Pedidos unicos", "blue"),
+      kpi("Items VTEX", fmt(s.pedidosVtexItems), `${fmt(s.pedidosVtexUnicos)} pedidos unicos`, "blue"),
+      kpi("Bajas", fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems)), `${fmt(valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos))} pedidos`, "orange"),
+      kpi("Despachados", fmt(s.despachados), "Requiere seguimiento", s.despachados ? "red" : "purple"),
+      kpi("Importe pagado", fmtMoney(s.importePagado), "Base bajas", "red"),
+      kpi("Diferencia", fmtMoney(Math.abs(toNumber(s.diferenciaTotal))), "Monto a gestionar", "red")
     ].join("");
-  }
-
-  function buildSkuFromVtex() {
-    const grouped = new Map();
-    state.raw.pedidosVtex.forEach((row) => {
-      const sku = getValue(row, ["Reference Code", "SKU", "Sku", "sku", "ID_SKU"]);
-      if (!sku) return;
-
-      const order = getValue(row, ["Order", "Nro Pedido", "nro_pedido_canal"]);
-      const current = grouped.get(sku) || {
-        sku,
-        producto: getValue(row, ["SKU Name", "Producto", "producto"]),
-        sitios: new Set(),
-        pedidos: new Set(),
-        unidades: 0,
-        monto: 0
-      };
-
-      const seller = getValue(row, ["Seller Name", "Tienda", "Host"]);
-      if (seller) current.sitios.add(seller);
-      if (order) current.pedidos.add(order);
-      current.unidades += toNumber(getValue(row, ["Quantity_SKU", "Cantidad", "cantidad"])) || 1;
-      current.monto += toNumber(getValue(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
-      grouped.set(sku, current);
-    });
-
-    return Array.from(grouped.values())
-      .map((item) => ({
-        sku: item.sku,
-        producto: item.producto,
-        sitios: Array.from(item.sitios).join(", "),
-        pedidos: item.pedidos.size,
-        unidades: item.unidades,
-        monto: item.monto
-      }))
-      .sort((a, b) => b.pedidos - a.pedidos)
-      .slice(0, 200);
   }
 
   function renderBajas() {
     const filter = state.filters.bajas;
-    const rows = applyFilter(state.raw.darDeBaja, filter);
+    const rows = applyBajaFilter(state.bajasPrioritarias || [], filter);
     const page = paginate(rows, filter);
 
     $("#countBajas").textContent = `${fmt(rows.length)} items`;
     $("#tbodyBajas").innerHTML = page.length ? page.map((row) => {
-      const dispatch = hasDispatch(row);
+      const dispatch = isDispatch(row);
       return `
         <tr class="${dispatch ? "flagged" : ""}">
-          <td class="td-mono">${escapeHtml(getValue(row, ["nro_pedido_canal", "Nro Pedido"]))}</td>
-          <td class="td-mono">${escapeHtml(getValue(row, ["sku", "SKU"]))}</td>
-          <td>${escapeHtml(getValue(row, ["producto", "Producto"]))}</td>
-          <td class="td-right td-mono">${fmtNumberValue(getValue(row, ["cantidad", "Cantidad"]))}</td>
-          <td class="td-right td-mono">${fmtMoney(toNumber(getValue(row, ["importe_pagado", "Importe Pagado"])))}</td>
-          <td class="td-right td-mono">${fmtMoney(toNumber(getValue(row, ["precio_actual", "Precio Actual"])))}</td>
-          <td class="td-right td-mono">${fmtMoney(toNumber(getValue(row, ["diff$", "Diff", "diff"])))}</td>
+          <td class="td-mono">${escapeHtml(row.nro_pedido_canal)}</td>
+          <td class="td-mono">${escapeHtml(row.sku)}</td>
+          <td>${escapeHtml(row.producto)}</td>
+          <td class="td-right td-mono">${fmt(row.cantidad)}</td>
+          <td class="td-right td-mono">${fmtMoney(row.importe_pagado)}</td>
+          <td class="td-right td-mono">${fmtMoney(row.precio_actual)}</td>
+          <td class="td-right td-mono">${fmtMoney(row.diff)}</td>
           <td><span class="badge ${dispatch ? "badge-red" : "badge-green"}">${dispatch ? "Con envio" : "Sin envio"}</span></td>
-          <td class="td-mono">${escapeHtml(getValue(row, ["nro_seguimiento", "Seguimiento"]) || "-")}</td>
+          <td class="td-mono">${escapeHtml(row.nro_seguimiento || "-")}</td>
+          <td><span class="badge ${priorityClass(row.prioridad)}">${escapeHtml(row.prioridad || "Media")}</span></td>
         </tr>`;
-    }).join("") : emptyRow(9, "Conectar hoja dar_de_baja para visualizar los items completos.");
+    }).join("") : emptyRow(10, "No hay bajas para mostrar con los filtros actuales.");
 
     renderPager("#pagerBajas", rows.length, filter, renderBajas);
   }
@@ -353,14 +352,21 @@
     if (btn.dataset.filterClear) {
       filter.field = null;
       filter.value = null;
+      filter.dispatchOnly = false;
       filter.page = 1;
       $$(`[data-filter-table="${table}"]`).forEach((el) => el.classList.remove("active"));
+    } else if (btn.dataset.filterDispatch) {
+      filter.dispatchOnly = !filter.dispatchOnly;
+      filter.page = 1;
+      btn.classList.toggle("active", filter.dispatchOnly);
     } else {
       const same = filter.field === btn.dataset.filterField && filter.value === btn.dataset.filterValue;
       filter.field = same ? null : btn.dataset.filterField;
       filter.value = same ? null : btn.dataset.filterValue;
       filter.page = 1;
-      $$(`[data-filter-table="${table}"]`).forEach((el) => el.classList.remove("active"));
+      $$(`[data-filter-table="${table}"]`).forEach((el) => {
+        if (!el.dataset.filterDispatch) el.classList.remove("active");
+      });
       if (!same) btn.classList.add("active");
     }
 
@@ -373,6 +379,15 @@
     if (filter.field && filter.value) {
       result = result.filter((row) => normalizeText(row[filter.field]) === normalizeText(filter.value));
     }
+    if (filter.search) {
+      result = result.filter((row) => Object.values(row).some((value) => String(value || "").toLowerCase().includes(filter.search)));
+    }
+    return result;
+  }
+
+  function applyBajaFilter(rows, filter) {
+    let result = rows;
+    if (filter.dispatchOnly) result = result.filter(isDispatch);
     if (filter.search) {
       result = result.filter((row) => Object.values(row).some((value) => String(value || "").toLowerCase().includes(filter.search)));
     }
@@ -393,7 +408,7 @@
     }
 
     const buttons = [];
-    buttons.push(pageButton("‹", filter.page - 1, filter.page === 1));
+    buttons.push(pageButton("<", filter.page - 1, filter.page === 1));
     for (let page = 1; page <= pages; page += 1) {
       if (page === 1 || page === pages || Math.abs(page - filter.page) <= 2) {
         buttons.push(pageButton(page, page, false, page === filter.page));
@@ -401,7 +416,7 @@
         buttons.push("...");
       }
     }
-    buttons.push(pageButton("›", filter.page + 1, filter.page === pages));
+    buttons.push(pageButton(">", filter.page + 1, filter.page === pages));
     el.innerHTML = buttons.map((button) => typeof button === "string" ? `<span class="page-btn">${button}</span>` : button).join("");
     el.querySelectorAll("[data-page]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -418,6 +433,122 @@
   function showTab(tab) {
     $$(".nav-tab").forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === tab));
     $$(".tab-panel").forEach((panel) => panel.classList.toggle("active", panel.id === "tab-" + tab));
+  }
+
+  function buildLegacySummary(pedidosError, pedidosPim, pedidosVtex, darDeBaja) {
+    const manual = pedidosError.filter((row) => manualPayments.has(normalizeText(getPayment(row)))).length;
+    return {
+      pedidosError: pedidosError.length,
+      gestionManual: manual,
+      gestionAutomatica: Math.max(0, pedidosError.length - manual),
+      pedidosPimItems: pedidosPim.length,
+      pedidosPimUnicos: uniqueCount(pedidosPim, ["Nro Pedido", "nro_pedido_canal", "Nro pedido"]),
+      pedidosVtexItems: pedidosVtex.length,
+      pedidosVtexUnicos: uniqueCount(pedidosVtex, ["Order", "Nro Pedido", "nro_pedido_canal"]),
+      bajaItems: darDeBaja.length,
+      bajaPedidos: uniqueCount(darDeBaja, ["nro_pedido_canal", "Nro Pedido", "pedido"]),
+      despachados: darDeBaja.filter(isDispatch).length,
+      importePagado: sumBy(darDeBaja, ["importe_pagado", "Importe Pagado", "pagado"]),
+      diferenciaTotal: sumBy(darDeBaja, ["diff$", "Diff", "diff"])
+    };
+  }
+
+  function buildLegacyHealth(pedidosError, pedidosPim, pedidosVtex, darDeBaja) {
+    return {
+      status: "ok",
+      cacheStatus: "legacy",
+      ttlSeconds: 0,
+      sheets: {
+        pedidos_error: { name: "pedidos_error", found: pedidosError.length > 0, rows: pedidosError.length, missingColumns: [] },
+        pedidos_pim: { name: "pedidos_pim", found: pedidosPim.length > 0, rows: pedidosPim.length, missingColumns: [] },
+        pedidos_vtex: { name: "pedidos_vtex", found: pedidosVtex.length > 0, rows: pedidosVtex.length, missingColumns: [] },
+        dar_de_baja: { name: "dar_de_baja", found: darDeBaja.length > 0, rows: darDeBaja.length, missingColumns: [] }
+      }
+    };
+  }
+
+  function buildPaymentBreakdown(rows) {
+    const groups = {};
+    rows.forEach((row) => {
+      const tipo = getPayment(row) || "Sin dato";
+      if (!groups[tipo]) groups[tipo] = { tipo, pedidos: 0, gestion: manualPayments.has(normalizeText(tipo)) ? "Manual" : "Automatica" };
+      groups[tipo].pedidos += 1;
+    });
+    return Object.values(groups).sort((a, b) => b.pedidos - a.pedidos);
+  }
+
+  function buildHourlyError(rows) {
+    const groups = {};
+    rows.forEach((row) => {
+      const hora = getRealHour(row);
+      if (hora === "") return;
+      if (!groups[hora]) groups[hora] = { hora, pedidos: 0 };
+      groups[hora].pedidos += 1;
+    });
+    return Object.values(groups).sort((a, b) => Number(a.hora) - Number(b.hora));
+  }
+
+  function buildSkuFromVtex(rows) {
+    const grouped = new Map();
+    rows.forEach((row) => {
+      const sku = getValue(row, ["Reference Code", "SKU", "Sku", "sku", "ID_SKU"]);
+      if (!sku) return;
+      const order = getValue(row, ["Order", "Nro Pedido", "nro_pedido_canal"]);
+      const current = grouped.get(sku) || { sku, producto: getValue(row, ["SKU Name", "Producto", "producto"]), sitios: new Set(), pedidos: new Set(), unidades: 0, monto: 0 };
+      const seller = getValue(row, ["Seller Name", "Tienda", "Host"]);
+      if (seller) current.sitios.add(seller);
+      if (order) current.pedidos.add(order);
+      current.unidades += toNumber(getValue(row, ["Quantity_SKU", "Cantidad", "cantidad"])) || 1;
+      current.monto += toNumber(getValue(row, ["SKU Total Price", "Total Value", "Payment Value", "monto"]));
+      grouped.set(sku, current);
+    });
+    return Array.from(grouped.values()).map((item) => ({
+      sku: item.sku,
+      producto: item.producto,
+      sitios: Array.from(item.sitios).join(", "),
+      pedidos: item.pedidos.size,
+      unidades: item.unidades,
+      monto: item.monto
+    })).sort((a, b) => b.pedidos - a.pedidos).slice(0, 200);
+  }
+
+  function normalizeSkuRows(rows) {
+    return normalizeRows(rows).map((row) => ({
+      sku: getValue(row, ["sku", "SKU", "Reference Code"]),
+      producto: getValue(row, ["producto", "Producto", "SKU Name"]),
+      sitios: getValue(row, ["sitios", "Sitios", "Tienda"]),
+      pedidos: toNumber(getValue(row, ["pedidos", "Pedidos"])),
+      unidades: toNumber(getValue(row, ["unidades", "Unidades", "Cantidad"])),
+      monto: toNumber(getValue(row, ["monto", "Monto", "Total Value"]))
+    })).filter((row) => row.sku);
+  }
+
+  function buildBajasPrioritarias(rows) {
+    return normalizeRows(rows).map((row) => {
+      const diff = toNumber(getValue(row, ["diff$", "Diff", "diff"]));
+      const dispatch = isDispatch(row);
+      return {
+        nro_pedido_canal: getValue(row, ["nro_pedido_canal", "Nro Pedido"]),
+        sku: getValue(row, ["sku", "SKU"]),
+        producto: getValue(row, ["producto", "Producto"]),
+        cantidad: toNumber(getValue(row, ["cantidad", "Cantidad"])),
+        importe_pagado: toNumber(getValue(row, ["importe_pagado", "Importe Pagado"])),
+        precio_actual: toNumber(getValue(row, ["precio_actual", "Precio Actual"])),
+        diff,
+        estado_envio: getValue(row, ["Estado envio", "estado_envio"]),
+        nro_seguimiento: getValue(row, ["nro_seguimiento", "Seguimiento"]),
+        prioridad: dispatch ? "Urgente" : Math.abs(diff) >= 100000 ? "Alta" : "Media",
+        despachado: dispatch
+      };
+    }).sort((a, b) => priorityOrder(a.prioridad) - priorityOrder(b.prioridad) || Math.abs(b.diff) - Math.abs(a.diff));
+  }
+
+  function normalizeCronologia(rows) {
+    return normalizeRows(rows).map((row) => ({
+      hora: getValue(row, ["hora", "Hora"]),
+      titulo: getValue(row, ["titulo", "Titulo", "evento"]),
+      descripcion: getValue(row, ["descripcion", "Descripcion", "detalle"])
+    })).filter((row) => row.hora || row.titulo || row.descripcion);
   }
 
   function kpi(label, value, sub, color) {
@@ -472,14 +603,6 @@
     return (rows || []).filter((row) => row && Object.values(row).some((value) => String(value || "").trim() !== ""));
   }
 
-  function groupCount(rows, getter) {
-    return rows.reduce((acc, row) => {
-      const key = String(getter(row) || "").trim();
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-  }
-
   function uniqueCount(rows, fields) {
     const values = new Set();
     rows.forEach((row) => {
@@ -507,34 +630,39 @@
     return String((Number(match[1]) + 21) % 24);
   }
 
-  function hasDispatch(row) {
-    return Boolean(getValue(row, ["nro_seguimiento", "Seguimiento"])) || ["a", "d", "despachado"].includes(normalizeText(getValue(row, ["Estado envio", "estado_envio"])));
+  function isDispatch(row) {
+    if (row.despachado === true) return true;
+    const seguimiento = getValue(row, ["nro_seguimiento", "Seguimiento"]);
+    const estado = normalizeText(getValue(row, ["estado_envio", "Estado envio"]));
+    return Boolean(seguimiento) || ["a", "d", "despachado"].includes(estado);
   }
 
   function getValue(row, fields) {
     for (const field of fields) {
       if (row[field] !== undefined && row[field] !== null && String(row[field]).trim() !== "") return String(row[field]).trim();
+      const normalizedField = normalizeHeader(field);
+      const key = Object.keys(row).find((candidate) => normalizeHeader(candidate) === normalizedField);
+      if (key && row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== "") return String(row[key]).trim();
     }
     return "";
   }
 
-  function normalizeText(value) {
-    return String(value || "").trim().toLowerCase();
-  }
-
   function toNumber(value) {
     if (value === undefined || value === null || value === "") return 0;
-    const normalized = String(value).replace(/\./g, "").replace(",", ".");
-    const number = Number(normalized);
+    let text = String(value).trim().replace(/\$/g, "").replace(/\s/g, "");
+    if (!text) return 0;
+    if (text.includes(",") && text.includes(".")) text = text.replace(/\./g, "").replace(",", ".");
+    else if (text.includes(",")) text = text.replace(",", ".");
+    const number = Number(text);
     return Number.isFinite(number) ? number : 0;
+  }
+
+  function valueOr(value, fallback) {
+    return value === undefined || value === null || value === "" ? fallback : value;
   }
 
   function fmt(value) {
     return Number(value || 0).toLocaleString("es-AR", { maximumFractionDigits: 0 });
-  }
-
-  function fmtNumberValue(value) {
-    return fmt(toNumber(value));
   }
 
   function fmtMoney(value) {
@@ -546,8 +674,35 @@
   }
 
   function formatHour(hour) {
-    if (hour === "") return "-";
+    if (hour === "" || hour === undefined || hour === null) return "-";
     return String(hour).padStart(2, "0") + ":00";
+  }
+
+  function priorityClass(priority) {
+    if (priority === "Urgente") return "badge-red";
+    if (priority === "Alta") return "badge-orange";
+    return "badge-blue";
+  }
+
+  function priorityOrder(priority) {
+    return { Urgente: 0, Alta: 1, Media: 2 }[priority] ?? 3;
+  }
+
+  function sheetLabel(key) {
+    return {
+      pedidos_error: "Pedidos error",
+      pedidos_pim: "PIM",
+      pedidos_vtex: "VTEX",
+      dar_de_baja: "Bajas"
+    }[key] || key;
+  }
+
+  function normalizeHeader(value) {
+    return String(value || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  function normalizeText(value) {
+    return normalizeHeader(value);
   }
 
   function escapeHtml(value) {

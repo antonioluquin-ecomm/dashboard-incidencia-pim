@@ -13,7 +13,7 @@ Este proyecto muestra un tablero HTML para analizar el incidente de precio y sto
 
 ## Uso rapido
 
-La version actual consume el CSV publicado en `config.js`.
+La version actual consume Apps Script en `config.js`. La API debe devolver datos agregados seguros; no debe publicar filas crudas de VTEX ni datos personales.
 
 Para usar Apps Script:
 
@@ -82,6 +82,19 @@ appScriptUrl: "URL_DE_APPS_SCRIPT"
 - `diff$`
 - `Estado envio`
 - `nro_seguimiento`
+
+## Contrato seguro de Apps Script
+
+`Code.gs` devuelve:
+
+- `health`: estado de hojas, conteos, columnas faltantes y cache.
+- `summary`: KPIs principales.
+- `paymentBreakdown`: pedidos por medio de pago.
+- `hourlyError`: pedidos con error por hora real.
+- `skuImpact`: ranking SKU calculado sin datos personales.
+- `bajasPrioritarias`: columnas operativas seguras para gestionar bajas.
+
+No se exponen emails, telefonos, documentos, direcciones ni nombres de clientes.
 
 ## Hojas opcionales
 

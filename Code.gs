@@ -440,7 +440,7 @@ function buildPimPriceMetrics_(rows) {
     var order = getPimOrder_(row);
     var estado = getPimEstado_(row);
     var diff = getPimPriceDiff_(row);
-    var hasDiff = hasPimPriceDiff_(row);
+    var errorPrecio = hasErrorPrecio_(row); // confirmed incident price error (not promotions/coupons)
     var baja = isBajaEstado_(estado);
     var facturado = isFacturadoEstado_(estado);
 
@@ -449,7 +449,7 @@ function buildPimPriceMetrics_(rows) {
       if (order) orderSets.baja[order] = true;
     }
 
-    if (hasDiff) {
+    if (errorPrecio) {
       metrics.itemsConDiferencia += 1;
       metrics.importePagadoDiferencia += getPimPaidPrice_(row);
       metrics.diferenciaTotal += diff;
@@ -485,13 +485,16 @@ function buildPimPriceMetrics_(rows) {
 
 function buildBajasPrioritariasFromPim_(rows) {
   return rows.filter(function(row) {
-    return isBajaEstado_(getPimEstado_(row)) || hasPimPriceDiff_(row);
+    return isBajaEstado_(getPimEstado_(row)) || hasErrorPrecio_(row);
   }).map(function(row) {
     var diff = getPimPriceDiff_(row);
     var estado = getPimEstado_(row);
     var baja = isBajaEstado_(estado);
     var facturado = isFacturadoEstado_(estado);
-    var prioridad = facturado ? "Urgente" : Math.abs(diff) >= HIGH_DIFF_THRESHOLD ? "Alta" : baja ? "Media" : "Baja";
+    var errorPrecio = hasErrorPrecio_(row);
+    var prioridad = (facturado && errorPrecio) ? "Urgente" :
+                    (Math.abs(diff) >= HIGH_DIFF_THRESHOLD && errorPrecio) ? "Alta" :
+                    baja ? "Media" : "Baja";
 
     return {
       nro_pedido_canal: getPimOrder_(row),
@@ -504,9 +507,9 @@ function buildBajasPrioritariasFromPim_(rows) {
       estado_envio: estado,
       nro_seguimiento: "",
       prioridad: prioridad,
-      despachado: facturado,
+      despachado: facturado && errorPrecio,
       estado_pim: estado,
-      tipo_baja: baja && hasPimPriceDiff_(row) ? "Baja por diferencia" : baja ? "Baja normal" : "Diferencia activa"
+      tipo_baja: baja && errorPrecio ? "Baja por diferencia" : baja ? "Baja normal" : errorPrecio ? "Error precio incidente" : "Diferencia activa"
     };
   }).sort(function(a, b) {
     var order = { Urgente: 0, Alta: 1, Media: 2, Baja: 3 };
@@ -556,6 +559,12 @@ function hasPimPriceDiff_(row) {
   var correct = getPimCorrectPrice_(row);
   var diff = getPimPriceDiff_(row);
   return paid > 0 && correct > 0 && Math.abs(diff) > 0.01;
+}
+
+// Returns true only when the row is explicitly marked as a confirmed incident price error.
+// This avoids counting price differences caused by promotions, coupons, or other reasons.
+function hasErrorPrecio_(row) {
+  return normalizeText_(getAny_(row, ["Error Precio", "error_precio", "Error precio", "ErrorPrecio"])) === "si";
 }
 
 function isBajaEstado_(estado) {

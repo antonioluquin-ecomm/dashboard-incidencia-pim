@@ -919,6 +919,10 @@
     return normalizeRows(rows).map((row) => {
       const diff = toNumber(getValue(row, ["diff$", "Diff", "diff"]));
       const dispatch = isDispatch(row);
+      const errorPrecio = normalizeText(getValue(row, ["Error Precio", "error_precio", "Error precio"])) === "si";
+      // If the sheet has "Error Precio" column, use it to confirm incident errors.
+      // Otherwise fall back to dispatch status (old behavior).
+      const esIncidente = errorPrecio || (!row["Error Precio"] && !row["error_precio"] && !row["Error precio"] && dispatch);
       return {
         nro_pedido_canal: getValue(row, ["nro_pedido_canal", "Nro Pedido"]),
         sku: getValue(row, ["sku", "SKU"]),
@@ -929,8 +933,8 @@
         diff,
         estado_envio: getValue(row, ["Estado envio", "estado_envio"]),
         nro_seguimiento: getValue(row, ["nro_seguimiento", "Seguimiento"]),
-        prioridad: dispatch ? "Urgente" : Math.abs(diff) >= 100000 ? "Alta" : "Media",
-        despachado: dispatch
+        prioridad: esIncidente ? "Urgente" : Math.abs(diff) >= 100000 ? "Alta" : "Media",
+        despachado: esIncidente
       };
     }).sort((a, b) => priorityOrder(a.prioridad) - priorityOrder(b.prioridad) || Math.abs(b.diff) - Math.abs(a.diff));
   }

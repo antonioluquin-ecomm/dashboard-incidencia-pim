@@ -90,6 +90,20 @@ Estos valores se usan como fallback cuando la API no devuelve datos.
 
 ## Decisiones técnicas tomadas
 
+### Columna "Error Precio" — fuente de verdad para pedidos del incidente
+
+La hoja `pedidos_pim` tiene una columna `Error Precio` con valor `"Si"` en los ítems que **efectivamente salieron con precio incorrecto por el incidente**. Solo esos se consideran como "facturados con diferencia" y se usan para calcular `perdidaReal`, `facturadosConDiferenciaPedidos` y la prioridad "Urgente" en la tabla de bajas.
+
+**Por qué:** antes se calculaba la diferencia comparando `PrecioWEB != PrecioPIM`, pero eso incluía pedidos con descuentos, cupones y otras razones válidas de diferencia de precio. La columna `Error Precio` es la fuente de verdad manual revisada por el equipo.
+
+Funciones afectadas en `Code.gs`:
+- `hasErrorPrecio_(row)` — helper que lee la columna
+- `buildPimPriceMetrics_()` — usa `hasErrorPrecio_()` en lugar de `hasPimPriceDiff_()` para todos los conteos de "diferencia por incidente"
+- `buildBajasPrioritariasFromPim_()` — "Urgente" solo si `facturado && errorPrecio = Si`
+
+Función afectada en `app.js` (fallback CSV):
+- `buildBajasPrioritarias()` — si la columna existe, la usa; si no, cae al comportamiento anterior (dispatch)
+
 ### Seguridad
 - La tabla de "Pedidos con error" requiere contraseña operativa.
 - La contraseña se valida en Apps Script (`ERROR_TABLE_PASSWORD` como propiedad de script), **nunca en el HTML ni en `config.js`**.

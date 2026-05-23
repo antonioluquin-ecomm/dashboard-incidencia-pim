@@ -1141,13 +1141,14 @@
       { hora: "21-05 · 17:50", titulo: "Apagado deposito 45", descripcion: "Se apago el deposito 45 en ambas tiendas (Sporting y Woker) para contener la incidencia." },
       { hora: "21-05 · 19:00", titulo: "Notificacion a sucursales y automatizacion PIM", descripcion: "Se notifico a sucursales para no despachar. Agentes PIM crearon automatizacion masiva para cancelar pedidos con error en PIM, evitando trabajo manual. La automatizacion cancela en VTEX y VTEX genera reembolso en PayWay." },
       { hora: "22-05 · 08:30", titulo: "Pulso de cancelacion automatica hacia VTEX", descripcion: "Se envio el pulso de cancelacion. Se excluyeron pedidos abonados con MercadoPago y GoCuotas, que requieren gestion manual." },
-      { hora: "22-05 · 09:30", titulo: "Inicio reembolsos manuales MP y GoCuotas", descripcion: "Se paso el archivo con pedidos de error de MercadoPago y GoCuotas a la jefa de servicio al cliente para comenzar el proceso de reembolso manual." },
+      { hora: "22-05 · 09:30", titulo: "Inicio reembolsos manuales MP y GoCuotas", descripcion: "Se paso el archivo con los 620 pedidos de error de MercadoPago y GoCuotas a la jefa de servicio al cliente para comenzar el proceso de reembolso manual." },
       { hora: "22-05 · 10:00", titulo: "Reunion con PIM", descripcion: "Reunion para aclarar el error, definir causa raiz y acordar proximos pasos." },
       { hora: "22-05 · 10:50", titulo: "Normalizacion B2B completada", descripcion: "Termino de impactar el push para B2B, normalizando precio y stock en ese canal." },
       { hora: "22-05 · 11:30", titulo: "Reactivacion deposito 45", descripcion: "Se activo nuevamente el deposito 45 una vez confirmada la normalizacion de datos." },
       { hora: "22-05 · 12:30", titulo: "Automatizacion de cancelacion completada", descripcion: "Termino de correr la automatizacion de cancelacion de pedidos con error hacia VTEX." },
       { hora: "22-05 · 13:00", titulo: "Baja manual de pedidos activos en PIM", descripcion: "Se avanzo con la baja de pedidos que ingresaron a PIM pero tenian items con diferencia de precios y aun no estaban despachados. Se realizo de forma manual desde PIM." },
-      { hora: "22-05 · 13:45", titulo: "Reactivacion depositos 17 y 01", descripcion: "Se reactivaron los depositos 17 y 01 confirmando la normalizacion completa del incidente." }
+      { hora: "22-05 · 13:45", titulo: "Reactivacion depositos 17 y 01", descripcion: "Se reactivaron los depositos 17 y 01 confirmando la normalizacion completa del incidente." },
+      { hora: "22-05 · 17:00", titulo: "Finalizacion de reembolsos manuales", descripcion: "Los agentes de servicio al cliente completaron la gestion de los 620 reembolsos manuales correspondientes a pedidos abonados con MercadoPago y GoCuotas." }
     ];
   }
 

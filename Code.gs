@@ -180,7 +180,8 @@ function buildSummary_(pedidosError, pedidosPim, pedidosVtex, pedidosVtexError) 
     importePagado: pimMetrics.importePagadoDiferencia,
     diferenciaTotal: pimMetrics.diferenciaTotal,
     perdidaReal: pimMetrics.perdidaReal,
-    despachados: pimMetrics.facturadosConDiferenciaItems
+    despachados: pimMetrics.facturadosConDiferenciaItems,
+    errorPrecioColumnPresente: pimMetrics.errorPrecioColumnPresente
   };
 }
 
@@ -436,11 +437,19 @@ function buildPimPriceMetrics_(rows) {
     perdidaReal: 0
   };
 
+  // If the "Error Precio" column doesn't exist in the sheet, fall back to any
+  // price-diff row (old behavior). This prevents perdidaReal from silently
+  // showing $0 when the column simply hasn't been added to the sheet yet.
+  var errorPrecioColPresente = hasErrorPrecioColumnInRows_(rows);
+  var isErrorIncidente_ = errorPrecioColPresente
+    ? function(row) { return hasErrorPrecio_(row); }
+    : function(row) { return hasPimPriceDiff_(row); };
+
   rows.forEach(function(row) {
     var order = getPimOrder_(row);
     var estado = getPimEstado_(row);
     var diff = getPimPriceDiff_(row);
-    var errorPrecio = hasErrorPrecio_(row); // confirmed incident price error (not promotions/coupons)
+    var errorPrecio = isErrorIncidente_(row);
     var baja = isBajaEstado_(estado);
     var facturado = isFacturadoEstado_(estado);
 
@@ -474,6 +483,8 @@ function buildPimPriceMetrics_(rows) {
     }
   });
 
+  metrics.errorPrecioColumnPresente = errorPrecioColPresente;
+
   metrics.bajaPedidos = Object.keys(orderSets.baja).length;
   metrics.bajaPorDiferenciaPedidos = Object.keys(orderSets.bajaDiff).length;
   metrics.bajaNormalPedidos = Object.keys(orderSets.bajaNormal).length;
@@ -484,14 +495,23 @@ function buildPimPriceMetrics_(rows) {
 }
 
 function buildBajasPrioritariasFromPim_(rows) {
+  // Same column-detection as buildPimPriceMetrics_: if "Error Precio" column is
+  // absent, fall back to any price-diff row so facturado rows stay "Urgente".
+  var errorPrecioColPresente = hasErrorPrecioColumnInRows_(rows);
+  var isErrorIncidente_ = errorPrecioColPresente
+    ? function(row) { return hasErrorPrecio_(row); }
+    : function(row) { return hasPimPriceDiff_(row); };
+
   return rows.filter(function(row) {
-    return isBajaEstado_(getPimEstado_(row)) || hasErrorPrecio_(row);
+    return isBajaEstado_(getPimEstado_(row)) || isErrorIncidente_(row);
   }).map(function(row) {
     var diff = getPimPriceDiff_(row);
     var estado = getPimEstado_(row);
     var baja = isBajaEstado_(estado);
     var facturado = isFacturadoEstado_(estado);
-    var errorPrecio = hasErrorPrecio_(row);
+    var errorPrecio = isErrorIncidente_(row);
+    // When column absent (fallback), any facturado row is Urgente — same as before.
+    // When column present, requires explicit errorPrecio = 'Si'.
     var prioridad = (facturado && errorPrecio) ? "Urgente" :
                     (Math.abs(diff) >= HIGH_DIFF_THRESHOLD && errorPrecio) ? "Alta" :
                     baja ? "Media" : "Baja";
@@ -565,6 +585,21 @@ function hasPimPriceDiff_(row) {
 // This avoids counting price differences caused by promotions, coupons, or other reasons.
 function hasErrorPrecio_(row) {
   return normalizeText_(getAny_(row, ["Error Precio", "error_precio", "Error precio", "ErrorPrecio"])) === "si";
+}
+
+// Returns true if the "Error Precio" column exists as a header in the dataset.
+// Uses hasOwnProperty so an empty value still counts as "present" — that means
+// the team created the column but didn't annotate some rows, which is different
+// from "column not in the sheet at all".
+function hasErrorPrecioColumnInRows_(rows) {
+  if (!rows || rows.length === 0) return false;
+  var aliases = ["Error Precio", "error_precio", "Error precio", "ErrorPrecio"];
+  var sample = rows.slice(0, Math.min(rows.length, 10));
+  return sample.some(function(row) {
+    return aliases.some(function(alias) {
+      return Object.prototype.hasOwnProperty.call(row, alias);
+    });
+  });
 }
 
 function isBajaEstado_(estado) {

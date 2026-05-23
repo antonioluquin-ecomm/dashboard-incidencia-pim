@@ -764,6 +764,145 @@ tr.flagged td {
   color: var(--text);
 }
 
+/* ── Incident brief ─────────────────────────────────────────── */
+.incident-brief {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 24px;
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--orange);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.brief-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.brief-date {
+  color: var(--quiet);
+  font-size: 12px;
+}
+
+.brief-cause {
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+
+.brief-cause strong { color: var(--text); }
+
+.brief-alert {
+  padding: 9px 12px;
+  border: 1px solid rgba(245,165,36,.28);
+  border-radius: 6px;
+  background: rgba(245,165,36,.09);
+  color: #ffd38a;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.brief-alert strong { color: var(--orange); }
+
+.brief-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.brief-stat {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  text-align: center;
+  min-width: 96px;
+}
+
+.brief-val {
+  font-size: 22px;
+  font-weight: 850;
+  line-height: 1;
+  margin-bottom: 5px;
+}
+
+.brief-val.red    { color: var(--red); }
+.brief-val.orange { color: var(--orange); }
+.brief-val.blue   { color: var(--blue); }
+.brief-val.green  { color: var(--green); }
+.brief-val.muted  { color: var(--muted); }
+
+.brief-key {
+  color: var(--quiet);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  line-height: 1.3;
+}
+
+/* ── Timeline types ─────────────────────────────────────────── */
+.timeline-item.tl-detection  { border-left: 3px solid var(--blue); }
+.timeline-item.tl-action      { border-left: 3px solid var(--orange); }
+.timeline-item.tl-escalation  { border-left: 3px solid var(--purple); }
+.timeline-item.tl-resolution  { border-left: 3px solid var(--green); }
+
+.timeline-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 5px;
+}
+
+.timeline-title-row .timeline-title {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.timeline-day-sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 8px;
+  color: var(--quiet);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.timeline-day-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.timeline-legend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+/* ── Diff column ────────────────────────────────────────────── */
+.td-diff-neg {
+  color: var(--red);
+  font-weight: 700;
+}
+
+/* ── Data health (movido al final) ──────────────────────────── */
+#dataHealth {
+  margin-top: 20px;
+}
+
 @media (max-width: 860px) {
   .site-header,
   .section-heading,
@@ -808,5 +947,13 @@ tr.flagged td {
   .health-grid,
   .health-row {
     grid-template-columns: 1fr;
+  }
+
+  .incident-brief {
+    grid-template-columns: 1fr;
+  }
+
+  .brief-stats {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

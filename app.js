@@ -34,7 +34,8 @@
     pedidosErrorUnlocked: false,
     filters: {
       errores: { search: "", field: null, value: null, page: 1, perPage: 50 },
-      bajas: { search: "", dispatchOnly: false, page: 1, perPage: 25 }
+      bajas: { search: "", dispatchOnly: false, page: 1, perPage: 25 },
+      sku: { search: "" }
     }
   };
 
@@ -72,6 +73,13 @@
     });
     $("#exportErroresBtn").addEventListener("click", exportErrores);
     $("#exportBajasBtn").addEventListener("click", exportBajas);
+    const skuSearch = $("#searchSku");
+    if (skuSearch) {
+      skuSearch.addEventListener("input", (event) => {
+        state.filters.sku.search = event.target.value.trim().toLowerCase();
+        renderSku();
+      });
+    }
   }
 
   async function loadData(options = {}) {
@@ -277,13 +285,12 @@
   function renderAll() {
     renderRiskStrip();
     renderExecutiveStory();
-    renderHealth();
     renderSummaryKpis();
     renderFinancialKpis();
-    renderFinancialExplanation();
     renderPaymentBreakdown();
     renderStoreBreakdown();
     renderHourChart();
+    renderHealth();
     renderPedidosError();
     renderTimeline();
     renderSku();
@@ -306,33 +313,29 @@
   function renderExecutiveStory() {
     const s = state.summary || {};
     const f = state.financialImpact || {};
-    $("#executiveStory").innerHTML = [
-      {
-        title: "Causa raiz",
-        text: `Credenciales de API de <strong>produccion</strong> quedaron en ambiente QA durante el desarrollo del proyecto de multidepositos. Al tocar precio y stock no se cambiaron las credenciales por las de dev, enviando datos ficticios. El error impacto en <strong>Sporting y Woker</strong>. Ya fue corregido y se envio un push de actualizacion sobre los productos afectados.`
-      },
-      {
-        title: "Que paso",
-        text: `El universo revisado combina <strong>${fmt(s.pedidosError)}</strong> pedidos que cayeron en error PIM y <strong>${fmt(s.pedidosPimUnicos)}</strong> pedidos que si ingresaron a PIM. En total son <strong>${fmt(s.pedidosTotalesIncidente)}</strong> pedidos bajo analisis.`
-      },
-      {
-        title: "Donde impacta",
-        text: `Dentro de PIM hay <strong>${fmt(s.pimConDiferenciaPedidos)}</strong> pedidos con diferencia de precio. De ellos, <strong>${fmt(s.bajaPorDiferenciaPedidos)}</strong> ya quedaron en baja y <strong>${fmt(s.expuestosConDiferenciaPedidos)}</strong> siguen expuestos o facturados.`
-      },
-      {
-        title: "Que hacer primero",
-        text: `Priorizar los <strong>${fmt(s.facturadosConDiferenciaPedidos)}</strong> pedidos facturados con diferencia y los <strong>${fmt(s.gestionManual)}</strong> pedidos de error que requieren gestion manual.`
-      },
-      {
-        title: "Acciones tomadas",
-        text: `Cancelacion automatica masiva enviada a VTEX el 22-05. Pedidos de <strong>MercadoPago y GoCuotas</strong> excluidos de la automatizacion — se gestionan con reembolso manual via servicio al cliente. Depositos 01, 17 y 45 apagados y luego reactivados al confirmar normalizacion.`
-      }
-    ].map((item) => `
-      <article class="story-card">
-        <h3>${item.title}</h3>
-        <p>${item.text}</p>
-      </article>
-    `).join("");
+    const manual = toNumber(s.gestionManual);
+    const perdida = f.perdidaReal != null ? toNumber(f.perdidaReal) : toNumber(s.perdidaReal);
+
+    const stat = (v, label, cls) =>
+      `<div class="brief-stat"><div class="brief-val ${cls}">${escapeHtml(String(v))}</div><div class="brief-key">${escapeHtml(label)}</div></div>`;
+
+    $("#executiveStory").innerHTML = `
+      <div class="incident-brief">
+        <div class="brief-text-col">
+          <div class="brief-meta">
+            <span class="badge badge-orange">Contenido</span>
+            <span class="brief-date">21–22 mayo 2026 · Sporting y Woker</span>
+          </div>
+          <p class="brief-cause">Credenciales de API de <strong>producción</strong> en ambiente QA enviaron precios y stock ficticios durante el proyecto de multidepósitos. Depósitos 01, 17 y 45 apagados y normalizados el 22-05. Cancelación automática enviada a VTEX.</p>
+          ${manual > 0 ? `<div class="brief-alert"><strong>Pendiente:</strong> ${fmt(manual)} pedidos de MercadoPago Pro / GoCuotas requieren reembolso manual por servicio al cliente.</div>` : ""}
+        </div>
+        <div class="brief-stats">
+          ${stat(fmt(valueOr(s.pedidosError, cfg.expectedTotals.pedidosError)), "Pedidos rechazados", "red")}
+          ${stat(fmt(manual), "Gestión manual", "orange")}
+          ${stat(fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), "Ingresaron a PIM", "blue")}
+          ${stat(fmtMoney(perdida), "Pérdida expuesta", perdida > 0 ? "red" : "muted")}
+        </div>
+      </div>`;
   }
 
   function renderHealth() {
@@ -371,49 +374,36 @@
   }
 
   function renderSummaryKpis() {
-    const s = state.summary;
+    const s = state.summary || {};
+    const f = state.financialImpact || {};
+    const perdida = f.perdidaReal != null ? f.perdidaReal : s.perdidaReal;
     $("#summaryKpis").innerHTML = [
-      kpi("Total pedidos", fmt(s.pedidosTotalesIncidente), "Error PIM + pedidos ingresados a PIM", "purple"),
-      kpi("Pedidos con error", fmt(valueOr(s.pedidosError, cfg.expectedTotals.pedidosError)), "No ingresaron a PIM", "red"),
-      kpi("Pedidos ingresados PIM", fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), `${fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems))} items`, "blue"),
-      kpi("Ingresaron sin dif.", fmt(s.pedidosPimSinError), "Pedidos PIM sin diferencia de precio", "green"),
-      kpi("Bajas PIM", fmt(valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos)), `${fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems))} items en estado Baja`, "orange"),
-      kpi("Bajas por dif.", fmt(s.bajaPorDiferenciaPedidos), `${fmt(s.bajaPorDiferenciaItems)} items con precio incorrecto`, "orange"),
-      kpi("Facturados con dif.", fmt(s.facturadosConDiferenciaPedidos), "Pedidos que avanzaron con precio incorrecto", "red"),
-      kpi("Expuestos con dif.", fmt(s.expuestosConDiferenciaPedidos), "Activos, asignados, cola o facturados", "red"),
-      kpi("Unidades rechazadas", fmt(s.unidadesRechazadas), "Unidades dentro de esos pedidos", "orange"),
-      kpi("SKUs afectados", fmt(s.skusErrorUnicos), "Productos distintos involucrados", "orange"),
-      kpi("Gestion manual", fmt(s.gestionManual), "Requieren accion humana", "orange"),
-      kpi("Gestion automatica", fmt(s.gestionAutomatica), "Se reprocesan o cancelan por sistema", "green")
+      kpi("Gestión manual pendiente", fmt(s.gestionManual), "MercadoPago Pro y GoCuotas — reembolso por servicio al cliente", "orange"),
+      kpi("Facturados con diferencia", fmt(s.facturadosConDiferenciaPedidos), "Avanzaron con precio incorrecto — revisar en pestaña PIM y bajas", "red"),
+      kpi("Pérdida expuesta", fmtMoney(perdida), "Diferencia de precio fuera del estado Baja", "red"),
+      kpi("Bajas por diferencia", fmt(s.bajaPorDiferenciaPedidos), `${fmt(s.bajaPorDiferenciaItems)} ítems dados de baja por precio incorrecto`, "orange"),
     ].join("");
   }
 
   function renderFinancialKpis() {
+    const s = state.summary || {};
     const f = state.financialImpact || {};
     $("#financialKpis").innerHTML = [
-      kpi("Monto rechazado", fmtMoney(f.montoRechazado), "Solo pedidos con error", "red"),
-      kpi("Valor total PIM", fmtMoney(f.valorTotalPim), "Items ingresados a PIM", "blue"),
-      kpi("Valor facturado", fmtMoney(f.valorFacturado), "Pedidos facturados", "green"),
-      kpi("Importe con dif.", fmtMoney(f.importeCobradoError), "Items PIM con diferencia", "orange"),
-      kpi("Diferencia detectada", fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto))), "Precio PIM - precio WEB", "red"),
-      kpi("Perdida expuesta", fmtMoney(f.perdidaReal), "Diferencia no contenida en Baja", "red"),
-      kpi("Ticket normal ref.", fmtMoney(f.ticketPromedioActual), "Ticket promedio habitual usado como referencia", "blue"),
-      kpi("Ticket del incidente", fmtMoney(f.ticketPromedioError), "Monto rechazado / pedidos con error", "purple"),
-      kpi("Brecha de error", fmtMoney(f.brechaTicket), "Actual - error", "red"),
-      kpi("Potencial perdida", fmtMoney(f.potencialPerdida), "Brecha x pedidos error", "red"),
-      kpi("Precio prom. correcto", fmtMoney(f.precioPromedioCorrectoBaja), "Items de baja", "orange"),
-      kpi("Precio prom. pagado", fmtMoney(f.precioPromedioPagadoBaja), "Items de baja", "red")
+      kpi("Pedidos rechazados", fmt(valueOr(s.pedidosError, cfg.expectedTotals.pedidosError)), `${fmt(s.gestionAutomatica)} automática · ${fmt(s.gestionManual)} manual`, "red"),
+      kpi("Ingresaron a PIM", fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), `${fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems))} ítems registrados en sistema`, "blue"),
+      kpi("Bajas PIM", fmt(valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos)), `${fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems))} ítems dados de baja`, "orange"),
+      kpi("Monto rechazado", fmtMoney(f.montoRechazado), "Suma total de pedidos con error", "red"),
+      kpi("Valor total en PIM", fmtMoney(f.valorTotalPim), "Ítems que ingresaron a PIM", "blue"),
+      kpi("SKUs únicos afectados", fmt(s.skusErrorUnicos), "Productos distintos involucrados en pedidos de error", "purple"),
     ].join("");
   }
 
-  function renderFinancialExplanation() {
-    const f = state.financialImpact || {};
-    $("#financialExplanation").innerHTML = `
-      <strong>Lectura financiera:</strong>
-      los pedidos que cayeron en error representan ${fmtMoney(f.montoRechazado)} de venta rechazada.
-      El ticket del incidente fue de ${fmtMoney(f.ticketPromedioError)}, contra un ticket normal de referencia de ${fmtMoney(f.ticketPromedioActual)}.
-      Esa brecha explica un potencial de perdida estimado de ${fmtMoney(f.potencialPerdida)}.
-      En los pedidos que si ingresaron a PIM, la diferencia detectada suma ${fmtMoney(Math.abs(toNumber(f.diferenciaPrecioCorrecto)))} y la perdida expuesta fuera de estado Baja es ${fmtMoney(f.perdidaReal)}.`;
+  function classifyTimelineEvent(titulo, descripcion) {
+    const t = normalizeText(titulo + " " + descripcion);
+    if (t.includes("deteccion") || t.includes("detecta") || t.includes("alerta")) return "detection";
+    if (t.includes("escalad") || t.includes("escalo") || t.includes("b2b")) return "escalation";
+    if (t.includes("completad") || t.includes("normalizacion") || t.includes("reactivacion") || t.includes("reunion")) return "resolution";
+    return "action";
   }
 
   function renderPaymentBreakdown() {
@@ -504,22 +494,49 @@
 
   function renderTimeline() {
     const rows = state.cronologia.length ? state.cronologia : defaultTimeline();
-    $("#timeline").innerHTML = rows.map((row) => `
-      <article class="timeline-item">
-        <div class="timeline-time">${escapeHtml(getValue(row, ["hora", "Hora"]) || "Pendiente")}</div>
+    const typeLabel = { detection: "Detección", action: "Acción", escalation: "Escalado", resolution: "Resolución" };
+    const typeBadge = { detection: "badge-blue", action: "badge-orange", escalation: "badge-purple", resolution: "badge-green" };
+
+    let lastDay = "";
+    const html = rows.map((row) => {
+      const hora = getValue(row, ["hora", "Hora"]) || "";
+      const titulo = getValue(row, ["titulo", "Titulo", "evento"]) || "Evento sin título";
+      const descripcion = getValue(row, ["descripcion", "Descripcion", "detalle"]) || "";
+      const type = classifyTimelineEvent(titulo, descripcion);
+      const dayPart = hora.split("·")[0].trim();
+      let dayHeader = "";
+      if (dayPart && dayPart !== lastDay) {
+        lastDay = dayPart;
+        dayHeader = `<div class="timeline-day-sep"><span>${escapeHtml(dayPart)}</span></div>`;
+      }
+      return `${dayHeader}<article class="timeline-item tl-${type}">
+        <div class="timeline-time">${escapeHtml(hora || "Pendiente")}</div>
         <div>
-          <div class="timeline-title">${escapeHtml(getValue(row, ["titulo", "Titulo", "evento"]) || "Evento sin titulo")}</div>
-          <p class="timeline-desc">${escapeHtml(getValue(row, ["descripcion", "Descripcion", "detalle"]) || "")}</p>
+          <div class="timeline-title-row">
+            <div class="timeline-title">${escapeHtml(titulo)}</div>
+            <span class="badge ${typeBadge[type]}">${typeLabel[type]}</span>
+          </div>
+          <p class="timeline-desc">${escapeHtml(descripcion)}</p>
         </div>
-      </article>
-    `).join("");
+      </article>`;
+    }).join("");
+
+    $("#timeline").innerHTML = html;
   }
 
   function renderSku() {
-    const rows = state.skuImpact || [];
-    $("#skuEmpty").classList.toggle("hidden", rows.length > 0);
-    $("#skuTableWrap").classList.toggle("hidden", rows.length === 0);
-    $("#tbodySku").innerHTML = rows.map((row) => `
+    const allRows = state.skuImpact || [];
+    const search = normalizeText(state.filters.sku.search || "");
+    const rows = search
+      ? allRows.filter((row) => normalizeText(row.sku + " " + row.producto).includes(search))
+      : allRows;
+
+    const countEl = $("#countSku");
+    if (countEl) countEl.textContent = `${fmt(rows.length)} SKUs`;
+
+    $("#skuEmpty").classList.toggle("hidden", allRows.length > 0);
+    $("#skuTableWrap").classList.toggle("hidden", allRows.length === 0);
+    $("#tbodySku").innerHTML = rows.length ? rows.map((row) => `
       <tr>
         <td class="td-mono">${escapeHtml(row.sku)}</td>
         <td>${escapeHtml(row.producto)}</td>
@@ -528,7 +545,7 @@
         <td class="td-right td-mono">${fmt(row.unidades)}</td>
         <td class="td-right td-mono">${fmtMoney(row.monto)}</td>
       </tr>
-    `).join("");
+    `).join("") : (allRows.length ? emptyRow(6, "Sin resultados para la búsqueda.") : "");
   }
 
   function renderPimKpis() {
@@ -554,6 +571,8 @@
     $("#countBajas").textContent = `${fmt(rows.length)} items`;
     $("#tbodyBajas").innerHTML = page.length ? page.map((row) => {
       const dispatch = isDispatch(row);
+      const diffVal = toNumber(row.diff);
+      const diffClass = diffVal < -100 ? "td-diff-neg" : "";
       return `
         <tr class="${dispatch ? "flagged" : ""}">
           <td class="td-mono">${escapeHtml(row.nro_pedido_canal)}</td>
@@ -562,12 +581,11 @@
           <td class="td-right td-mono">${fmt(row.cantidad)}</td>
           <td class="td-right td-mono">${fmtMoney(row.importe_pagado)}</td>
           <td class="td-right td-mono">${fmtMoney(row.precio_actual)}</td>
-          <td class="td-right td-mono">${fmtMoney(row.diff)}</td>
+          <td class="td-right td-mono ${diffClass}">${fmtMoney(diffVal)}</td>
           <td><span class="badge ${dispatch ? "badge-red" : normalizeText(row.estado_pim) === "baja" ? "badge-green" : "badge-orange"}">${escapeHtml(row.estado_pim || row.estado_envio || "-")}</span></td>
-          <td>${escapeHtml(row.tipo_baja || "-")}</td>
           <td><span class="badge ${priorityClass(row.prioridad)}">${escapeHtml(row.prioridad || "Media")}</span></td>
         </tr>`;
-    }).join("") : emptyRow(10, "No hay bajas para mostrar con los filtros actuales.");
+    }).join("") : emptyRow(9, "No hay bajas para mostrar con los filtros actuales.");
 
     renderPager("#pagerBajas", rows.length, filter, renderBajas);
   }
@@ -705,7 +723,6 @@
       { label: "Precio correcto",  key: "precio_actual" },
       { label: "Diferencia",       key: "diff" },
       { label: "Estado PIM",       key: "estado_pim" },
-      { label: "Tipo baja",        key: "tipo_baja" },
       { label: "Prioridad",        key: "prioridad" }
     ]);
   }

@@ -45,35 +45,32 @@
       </div>
 
       <div class="risk-strip" id="riskStrip"></div>
-      <div class="story-grid" id="executiveStory"></div>
-      <div id="dataHealth"></div>
+      <div id="executiveStory"></div>
 
       <div class="section-subhead">
-        <h3>1. Alcance del incidente</h3>
-        <span>Pedidos, unidades y gestión requerida</span>
+        <h3>Acción requerida</h3>
+        <span>Items que necesitan gestión humana o seguimiento</span>
       </div>
       <div class="kpi-grid" id="summaryKpis"></div>
 
       <div class="section-subhead">
-        <h3>2. Impacto financiero</h3>
-        <span>Montos y brechas principales</span>
+        <h3>Volumen del incidente</h3>
+        <span>Pedidos, montos y productos afectados</span>
       </div>
       <div class="kpi-grid" id="financialKpis"></div>
-
-      <div class="explain-box" id="financialExplanation"></div>
 
       <div class="dashboard-grid">
         <article class="panel">
           <div class="panel-header">
-            <h3>3. Medios de pago</h3>
-            <span>Gestion</span>
+            <h3>Medios de pago</h3>
+            <span>Gestión por tipo</span>
           </div>
           <div id="paymentBreakdown"></div>
         </article>
 
         <article class="panel">
           <div class="panel-header">
-            <h3>4. Pico horario</h3>
+            <h3>Pico horario</h3>
             <span>Solo pedidos con error</span>
           </div>
           <div class="hour-chart" id="hourChart"></div>
@@ -83,12 +80,14 @@
       <div class="dashboard-grid lower-grid">
         <article class="panel">
           <div class="panel-header">
-            <h3>5. Resumen por tienda</h3>
+            <h3>Resumen por tienda</h3>
             <span>Pedidos, unidades y monto</span>
           </div>
           <div id="storeBreakdown"></div>
         </article>
       </div>
+
+      <div id="dataHealth"></div>
     </section>
 
     <section class="tab-panel" id="tab-errores">
@@ -146,9 +145,16 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">Seguimiento</p>
-          <h2>Cronologia del incidente</h2>
+          <h2>Cronología del incidente</h2>
         </div>
-        <p class="section-note">Esta seccion puede alimentarse desde una hoja opcional llamada <strong>cronologia</strong> en Apps Script.</p>
+        <p class="section-note">Eventos del 21 y 22 de mayo 2026. Se puede actualizar desde la hoja <strong>cronologia</strong> en Apps Script.</p>
+      </div>
+
+      <div class="timeline-legend">
+        <span class="badge badge-blue">Detección</span>
+        <span class="badge badge-orange">Acción</span>
+        <span class="badge badge-purple">Escalado</span>
+        <span class="badge badge-green">Resolución</span>
       </div>
 
       <div class="timeline" id="timeline"></div>
@@ -158,9 +164,9 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">Productos afectados</p>
-          <h2>Analisis por SKU</h2>
+          <h2>Análisis por SKU</h2>
         </div>
-        <p class="section-note">Ranking calculado desde los pedidos VTEX que cayeron en error. El monto sale de la suma de precio total del SKU en esos pedidos.</p>
+        <p class="section-note">Ranking calculado desde los pedidos VTEX que cayeron en error. Monto = suma del precio total VTEX en esos pedidos.</p>
       </div>
 
       <div class="empty-state" id="skuEmpty">
@@ -168,9 +174,14 @@
         <p>Revisar que la hoja <strong>pedidos_vtex</strong> tenga SKU, producto, cantidad y pedido.</p>
       </div>
 
+      <div class="toolbar" id="skuToolbar">
+        <input class="search-input" id="searchSku" type="search" placeholder="Buscar SKU o producto">
+        <span class="row-count" id="countSku"></span>
+      </div>
+
       <div class="section-subhead">
-        <h3>Ranking general SKU</h3>
-        <span>Monto = suma del precio total VTEX de pedidos con error</span>
+        <h3>Ranking por impacto</h3>
+        <span>Ordenado por pedidos con error · monto = suma precio VTEX</span>
       </div>
       <div class="table-wrap hidden" id="skuTableWrap">
         <table>
@@ -192,18 +203,18 @@
     <section class="tab-panel" id="tab-pim">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">Gestion PIM</p>
+          <p class="eyebrow">Gestión PIM</p>
           <h2>PIM y bajas</h2>
         </div>
-        <p class="section-note">Las bajas se toman desde <strong>pedidos_pim</strong>. Se separan bajas normales, bajas por diferencia de precio y pedidos que siguieron activos o facturados con diferencia.</p>
+        <p class="section-note">Pedidos que ingresaron a PIM. Las filas en rojo son <strong>urgentes</strong>: ya estaban facturados o despachados con precio incorrecto.</p>
       </div>
 
       <div class="kpi-grid" id="pimKpis"></div>
 
       <div class="toolbar">
         <input class="search-input" id="searchBajas" type="search" placeholder="Buscar pedido, SKU, producto o estado">
-        <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-dispatch="true">Facturados con diferencia</button>
-        <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-clear="true">Limpiar</button>
+        <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-dispatch="true">Solo urgentes (facturados)</button>
+        <button class="filter-btn" type="button" data-filter-table="bajas" data-filter-clear="true">Limpiar filtro</button>
         <span class="row-count" id="countBajas"></span>
         <button class="filter-btn" type="button" id="exportBajasBtn">Exportar CSV</button>
       </div>
@@ -217,10 +228,9 @@
               <th>Producto</th>
               <th class="td-right">Cant.</th>
               <th class="td-right">Pagado</th>
-              <th class="td-right">Precio actual</th>
-              <th class="td-right">Diff</th>
+              <th class="td-right">Precio correcto</th>
+              <th class="td-right">Diferencia</th>
               <th>Estado PIM</th>
-              <th>Tipo</th>
               <th>Prioridad</th>
             </tr>
           </thead>

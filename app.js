@@ -284,9 +284,9 @@
 
   function renderAll() {
     renderRiskStrip();
-    renderExecutiveStory();
-    renderSummaryKpis();
-    renderFinancialKpis();
+    renderIncidentContext();
+    renderOrderFlow();
+    renderFinancialImpactSection();
     renderPaymentBreakdown();
     renderStoreBreakdown();
     renderHourChart();
@@ -310,32 +310,141 @@
       : `<strong>Base conectada:</strong> ${parts.join(", ") || "sin datos visibles todavia"}. Actualizar el Google Sheet refresca este tablero.`;
   }
 
-  function renderExecutiveStory() {
+  function renderIncidentContext() {
     const s = state.summary || {};
-    const f = state.financialImpact || {};
-    const manual = toNumber(s.gestionManual);
-    const perdida = f.perdidaReal != null ? toNumber(f.perdidaReal) : toNumber(s.perdidaReal);
+    const pedidosError = valueOr(s.pedidosError, cfg.expectedTotals.pedidosError);
+    const pedidosPim = valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos);
+    const total = pedidosError + pedidosPim;
+    $("#incidentContext").innerHTML = `
+      <div class="incident-context">
+        <span class="badge badge-orange">Contenido · 22-05-2026</span>
+        <p class="incident-context-text">
+          El 21 de mayo, credenciales de API de <strong>producción</strong> quedaron activas en ambiente QA durante el proyecto de multidepósitos.
+          Esto hizo que se enviaran precios y stock ficticios a <strong>Sporting y Woker</strong>.
+          En total, <strong>${fmt(total)} pedidos</strong> recibieron precios incorrectos:
+          <strong>${fmt(pedidosError)}</strong> fueron rechazados antes de procesar y
+          <strong>${fmt(pedidosPim)}</strong> llegaron a ingresar a PIM.
+          El incidente fue contenido el 22-05 con cancelación automática masiva y reactivación de depósitos.
+        </p>
+      </div>`;
+  }
 
-    const stat = (v, label, cls) =>
-      `<div class="brief-stat"><div class="brief-val ${cls}">${escapeHtml(String(v))}</div><div class="brief-key">${escapeHtml(label)}</div></div>`;
+  function renderOrderFlow() {
+    const s = state.summary || {};
+    const pedidosError = valueOr(s.pedidosError, cfg.expectedTotals.pedidosError);
+    const pedidosPim = valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos);
+    const total = pedidosError + pedidosPim;
+    const gestionAuto = toNumber(s.gestionAutomatica);
+    const gestionManual = toNumber(s.gestionManual);
+    const facturadosDiff = toNumber(s.facturadosConDiferenciaPedidos);
+    const bajaPedidos = valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos);
+    const pctError = total > 0 ? Math.round(pedidosError / total * 100) : 0;
+    const pctPim = total > 0 ? 100 - pctError : 0;
 
-    $("#executiveStory").innerHTML = `
-      <div class="incident-brief">
-        <div class="brief-text-col">
-          <div class="brief-meta">
-            <span class="badge badge-orange">Contenido</span>
-            <span class="brief-date">21–22 mayo 2026 · Sporting y Woker</span>
+    const flowRow = (label, val, cls = "") =>
+      `<div class="flow-row ${cls}">
+        <span class="flow-row-label">${escapeHtml(label)}</span>
+        <span class="flow-row-val">${val}</span>
+      </div>`;
+
+    $("#orderFlow").innerHTML = `
+      <div class="order-flow">
+        <div class="flow-summary-bar">
+          <div class="flow-summary-left">
+            <span class="flow-summary-number">${fmt(total)}</span>
+            <span class="flow-summary-label">pedidos afectados en total · 21–22 mayo 2026 · Sporting y Woker</span>
           </div>
-          <p class="brief-cause">Credenciales de API de <strong>producción</strong> en ambiente QA enviaron precios y stock ficticios durante el proyecto de multidepósitos. Depósitos 01, 17 y 45 apagados y normalizados el 22-05. Cancelación automática enviada a VTEX.</p>
-          ${manual > 0 ? `<div class="brief-alert"><strong>Pendiente:</strong> ${fmt(manual)} pedidos de MercadoPago Pro / GoCuotas requieren reembolso manual por servicio al cliente.</div>` : ""}
+          <div class="flow-split-bar">
+            <div class="flow-split-seg flow-split-red" style="width:${pctError}%">
+              <span>${pctError}% rechazados</span>
+            </div>
+            <div class="flow-split-seg flow-split-blue" style="width:${pctPim}%">
+              <span>${pctPim}% a PIM</span>
+            </div>
+          </div>
         </div>
-        <div class="brief-stats">
-          ${stat(fmt(valueOr(s.pedidosError, cfg.expectedTotals.pedidosError)), "Pedidos rechazados", "red")}
-          ${stat(fmt(manual), "Gestión manual", "orange")}
-          ${stat(fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), "Ingresaron a PIM", "blue")}
-          ${stat(fmtMoney(perdida), "Pérdida expuesta", perdida > 0 ? "red" : "muted")}
+        <div class="flow-buckets">
+          <div class="flow-bucket bucket-rejected">
+            <div class="flow-bucket-eyebrow">Rechazados · No llegaron a PIM</div>
+            <div class="flow-bucket-number red">${fmt(pedidosError)}</div>
+            <div class="flow-bucket-title">Pedidos rechazados</div>
+            <div class="flow-bucket-desc">
+              No había stock real o el precio era inválido. El sistema los rechazó antes de ingresar a PIM.
+              No generan pérdida directa, pero hay que devolver el dinero cobrado.
+            </div>
+            <div class="flow-rows">
+              ${flowRow("Cancelación automática — reembolso por PayWay/VTEX", fmt(gestionAuto), "green")}
+              ${flowRow("Reembolso manual completado el 22-05 — MercadoPago / GoCuotas", fmt(gestionManual), "orange")}
+            </div>
+          </div>
+          <div class="flow-bucket bucket-pim">
+            <div class="flow-bucket-eyebrow">Ingresaron a PIM · Había stock disponible</div>
+            <div class="flow-bucket-number blue">${fmt(pedidosPim)}</div>
+            <div class="flow-bucket-title">Procesados en PIM</div>
+            <div class="flow-bucket-desc">
+              Tenían stock real. Se asignaron a un depósito y avanzaron en el flujo operativo
+              con el precio incorrecto. Estos son los que generan pérdida económica real.
+            </div>
+            <div class="flow-rows">
+              ${flowRow("Dados de baja por precio incorrecto — corregidos", fmt(bajaPedidos), "green")}
+              ${flowRow("Facturados con precio incorrecto — ver pestaña PIM y bajas", fmt(facturadosDiff), facturadosDiff > 0 ? "red" : "")}
+            </div>
+          </div>
         </div>
       </div>`;
+  }
+
+  function renderFinancialImpactSection() {
+    const s = state.summary || {};
+    const f = state.financialImpact || {};
+    const perdidaReal = f.perdidaReal != null ? toNumber(f.perdidaReal) : toNumber(s.perdidaReal);
+    const potencialPerdida = toNumber(f.potencialPerdida);
+    const ticketActual = toNumber(f.ticketPromedioActual || (cfg.referenceMetrics && cfg.referenceMetrics.ticketPromedioActual));
+    const ticketError = toNumber(f.ticketPromedioError);
+    const brecha = toNumber(f.brechaTicket);
+    const pedidosError = valueOr(s.pedidosError, cfg.expectedTotals.pedidosError);
+    const facturadosDiff = toNumber(s.facturadosConDiferenciaPedidos);
+
+    const detailRow = (label, val, highlight = false) =>
+      `<div class="loss-detail-row${highlight ? " highlight" : ""}">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(String(val))}</strong>
+      </div>`;
+
+    const realCard = `
+      <div class="loss-card loss-real">
+        <div class="loss-card-eyebrow">1. Pérdida real confirmada</div>
+        <div class="loss-card-amount">${fmtMoney(perdidaReal)}</div>
+        <p class="loss-card-explain">
+          Son los pedidos que <strong>ya se facturaron</strong> con el precio incorrecto.
+          El cliente pagó menos de lo que correspondía según el precio real del producto.
+          Si el pedido ya salió despachado, la diferencia <strong>no se puede recuperar</strong>.
+        </p>
+        <div class="loss-detail-rows">
+          ${detailRow("Pedidos facturados con precio incorrecto", fmt(facturadosDiff))}
+          ${detailRow("Diferencia entre precio cobrado y precio correcto", fmtMoney(perdidaReal), true)}
+        </div>
+      </div>`;
+
+    const hasPotencial = potencialPerdida > 0 && ticketActual > 0;
+    const potentialCard = `
+      <div class="loss-card loss-potential">
+        <div class="loss-card-eyebrow">2. Pérdida potencial — riesgo evitado</div>
+        <div class="loss-card-amount">${hasPotencial ? fmtMoney(potencialPerdida) : "—"}</div>
+        <p class="loss-card-explain">
+          Si los <strong>${fmt(pedidosError)} pedidos rechazados</strong> hubieran avanzado hasta facturarse con el precio incorrecto,
+          esta habría sido la diferencia total respecto al precio correcto.
+          Muestra cuánto dinero se evitó perder al rechazarlos a tiempo.
+        </p>
+        <div class="loss-detail-rows">
+          ${detailRow("Ticket promedio al precio correcto", fmtMoney(ticketActual))}
+          ${detailRow("Ticket promedio con precio del incidente", fmtMoney(ticketError))}
+          ${detailRow("Diferencia de precio por pedido", fmtMoney(brecha))}
+          ${detailRow(fmt(pedidosError) + " pedidos × diferencia de precio", fmtMoney(potencialPerdida), true)}
+        </div>
+      </div>`;
+
+    $("#financialImpactSection").innerHTML = `<div class="loss-cards">${realCard}${potentialCard}</div>`;
   }
 
   function renderHealth() {

@@ -338,13 +338,19 @@
     const gestionAuto = toNumber(s.gestionAutomatica);
     const gestionManual = toNumber(s.gestionManual);
     const facturadosDiff = toNumber(s.facturadosConDiferenciaPedidos);
-    const bajaPedidos = valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos);
+    // Track source to avoid mixing live API data with hardcoded fallbacks in derived calculations
+    const hasPimLive = s.pedidosPimUnicos != null;
+    const hasBajaLive = s.bajaPedidos != null;
+    const bajaPedidos = hasBajaLive ? toNumber(s.bajaPedidos) : cfg.expectedTotals.bajaPedidos;
     const montoRechazado = toNumber(f.montoRechazado);
     const valorTotalPim = toNumber(f.valorTotalPim);
     const pctError = total > 0 ? Math.round(pedidosError / total * 100) : 0;
     const pctPim = total > 0 ? 100 - pctError : 0;
-    // pedidos PIM sin error de precio = total PIM menos los que sí tuvieron problema
-    const pimSinError = Math.max(0, pedidosPim - bajaPedidos - facturadosDiff);
+    // pimSinError is only reliable when both totals come from the same source.
+    // If one is live and the other is a hardcoded fallback the subtraction produces a meaningless number.
+    const pimSinError = (hasPimLive === hasBajaLive)
+      ? Math.max(0, pedidosPim - bajaPedidos - facturadosDiff)
+      : null;
 
     const flowRow = (label, val, cls = "") =>
       `<div class="flow-row ${cls}">
@@ -394,7 +400,7 @@
             </div>
             ${valorTotalPim > 0 ? `<div class="flow-monto">Valor total en PIM: <strong>${fmtMoney(valorTotalPim)}</strong></div>` : ""}
             <div class="flow-rows">
-              ${flowRow("Sin error de precio — operaron con normalidad", fmt(pimSinError))}
+              ${pimSinError != null ? flowRow("Sin error de precio — operaron con normalidad", fmt(pimSinError)) : flowRow("Sin error de precio — operaron con normalidad", "—")}
               ${flowRow("Dados de baja por precio incorrecto — corregidos", fmt(bajaPedidos), "green")}
               ${flowRow("Facturados con precio incorrecto — ver pestaña PIM y bajas", fmt(facturadosDiff), facturadosDiff > 0 ? "red" : "")}
             </div>
@@ -408,7 +414,10 @@
     const f = state.financialImpact || {};
     const perdidaReal = f.perdidaReal != null ? toNumber(f.perdidaReal) : toNumber(s.perdidaReal);
     const potencialPerdida = toNumber(f.potencialPerdida);
-    const ticketActual = toNumber(f.ticketPromedioActual || (cfg.referenceMetrics && cfg.referenceMetrics.ticketPromedioActual));
+    // Explicit null-check instead of || to avoid treating a valid 0 as falsy
+    const ticketActual = f.ticketPromedioActual != null
+      ? toNumber(f.ticketPromedioActual)
+      : toNumber(cfg.referenceMetrics && cfg.referenceMetrics.ticketPromedioActual);
     const ticketError = toNumber(f.ticketPromedioError);
     const brecha = toNumber(f.brechaTicket);
     const pedidosError = valueOr(s.pedidosError, cfg.expectedTotals.pedidosError);
@@ -490,31 +499,6 @@
         </div>
         ${sheets}
       </article>`;
-  }
-
-  function renderSummaryKpis() {
-    const s = state.summary || {};
-    const f = state.financialImpact || {};
-    const perdida = f.perdidaReal != null ? f.perdidaReal : s.perdidaReal;
-    $("#summaryKpis").innerHTML = [
-      kpi("Gestión manual pendiente", fmt(s.gestionManual), "MercadoPago Pro y GoCuotas — reembolso por servicio al cliente", "orange"),
-      kpi("Facturados con diferencia", fmt(s.facturadosConDiferenciaPedidos), "Avanzaron con precio incorrecto — revisar en pestaña PIM y bajas", "red"),
-      kpi("Pérdida expuesta", fmtMoney(perdida), "Diferencia de precio fuera del estado Baja", "red"),
-      kpi("Bajas por diferencia", fmt(s.bajaPorDiferenciaPedidos), `${fmt(s.bajaPorDiferenciaItems)} ítems dados de baja por precio incorrecto`, "orange"),
-    ].join("");
-  }
-
-  function renderFinancialKpis() {
-    const s = state.summary || {};
-    const f = state.financialImpact || {};
-    $("#financialKpis").innerHTML = [
-      kpi("Pedidos rechazados", fmt(valueOr(s.pedidosError, cfg.expectedTotals.pedidosError)), `${fmt(s.gestionAutomatica)} automática · ${fmt(s.gestionManual)} manual`, "red"),
-      kpi("Ingresaron a PIM", fmt(valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos)), `${fmt(valueOr(s.pedidosPimItems, cfg.expectedTotals.pedidosPimItems))} ítems registrados en sistema`, "blue"),
-      kpi("Bajas PIM", fmt(valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos)), `${fmt(valueOr(s.bajaItems, cfg.expectedTotals.bajaItems))} ítems dados de baja`, "orange"),
-      kpi("Monto rechazado", fmtMoney(f.montoRechazado), "Suma total de pedidos con error", "red"),
-      kpi("Valor total en PIM", fmtMoney(f.valorTotalPim), "Ítems que ingresaron a PIM", "blue"),
-      kpi("SKUs únicos afectados", fmt(s.skusErrorUnicos), "Productos distintos involucrados en pedidos de error", "purple"),
-    ].join("");
   }
 
   function classifyTimelineEvent(titulo, descripcion) {

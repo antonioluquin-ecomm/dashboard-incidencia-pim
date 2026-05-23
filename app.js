@@ -73,6 +73,11 @@
     });
     $("#exportErroresBtn").addEventListener("click", exportErrores);
     $("#exportBajasBtn").addEventListener("click", exportBajas);
+    $("#printBtn").addEventListener("click", () => {
+      const printDate = $("#printDate");
+      if (printDate) printDate.textContent = "Generado el " + new Date().toLocaleString("es-AR");
+      window.print();
+    });
     const skuSearch = $("#searchSku");
     if (skuSearch) {
       skuSearch.addEventListener("input", (event) => {
@@ -301,13 +306,15 @@
   }
 
   function renderIncidentStatus() {
-    const el = $("#incidentStatusBadge");
-    if (!el) return;
     const status = cfg.incidentStatus || "monitoring";
     const labels = { active: "Incidente activo", monitoring: "En seguimiento", closed: "Incidente cerrado" };
     const classes = { active: "badge-red", monitoring: "badge-orange", closed: "badge-green" };
-    el.textContent = labels[status] || labels.monitoring;
-    el.className = `badge ${classes[status] || classes.monitoring}`;
+    const label = labels[status] || labels.monitoring;
+    const cls = classes[status] || classes.monitoring;
+    const badge = $("#incidentStatusBadge");
+    if (badge) { badge.textContent = label; badge.className = `badge ${cls}`; }
+    const printLabel = $("#printStatusLabel");
+    if (printLabel) { printLabel.textContent = label; printLabel.className = `badge ${cls}`; }
   }
 
   function renderRiskStrip() {

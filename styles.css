@@ -1221,6 +1221,83 @@ tr.flagged td {
 
 .loss-detail-row.highlight strong { color: var(--text); font-size: 15px; }
 
+/* ── Print header (hidden on screen) ───────────────────────── */
+.print-header {
+  display: none;
+}
+
+/* ── Print styles ───────────────────────────────────────────── */
+@media print {
+  :root {
+    --bg: #fff;
+    --surface: #f8f9fa;
+    --surface-2: #eef0f3;
+    --surface-3: #e4e7ec;
+    --border: rgba(0,0,0,.14);
+    --text: #111827;
+    --muted: #4b5563;
+    --quiet: #6b7280;
+    --red: #c0392b;
+    --orange: #d97706;
+    --green: #059669;
+    --blue: #2563eb;
+    --purple: #7c3aed;
+  }
+
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  body { background: #fff; }
+
+  /* Show print header, hide screen header */
+  .print-header { display: block; margin-bottom: 28px; padding-bottom: 16px; border-bottom: 2px solid #111827; }
+  .print-header-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+  .print-eyebrow { margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .print-title { margin: 0 0 4px; font-size: 22px; font-weight: 850; color: var(--text); }
+  .print-subtitle { margin: 0; font-size: 13px; color: var(--muted); }
+  .print-meta { text-align: right; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+
+  .site-header,
+  .nav-tabs,
+  .loading-overlay,
+  .risk-strip,
+  .toolbar,
+  .paginator,
+  .unlock-panel,
+  .table-wrap,
+  #dataHealth,
+  #refreshButton,
+  #printBtn,
+  .error-banner { display: none !important; }
+
+  /* Show all tab panels as stacked sections */
+  .tab-panel { display: block !important; }
+
+  /* Hide tabs with too much raw data */
+  #tab-errores { display: none !important; }
+
+  .main { width: 100%; padding: 0; }
+
+  .section-heading { margin-bottom: 14px; }
+
+  #tab-cronologia { page-break-before: always; padding-top: 20px; }
+  #tab-sku        { page-break-before: always; padding-top: 20px; }
+  #tab-pim        { page-break-before: always; padding-top: 20px; }
+
+  .flow-buckets,
+  .loss-cards,
+  .story-grid { grid-template-columns: 1fr 1fr; }
+
+  .dashboard-grid { grid-template-columns: 1fr 1fr; }
+
+  .panel,
+  .flow-bucket,
+  .loss-card,
+  .story-card,
+  .kpi-card { box-shadow: none; break-inside: avoid; }
+
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
 @media (max-width: 860px) {
   .site-header,
   .section-heading,

@@ -331,6 +331,7 @@
 
   function renderOrderFlow() {
     const s = state.summary || {};
+    const f = state.financialImpact || {};
     const pedidosError = valueOr(s.pedidosError, cfg.expectedTotals.pedidosError);
     const pedidosPim = valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos);
     const total = pedidosError + pedidosPim;
@@ -338,8 +339,12 @@
     const gestionManual = toNumber(s.gestionManual);
     const facturadosDiff = toNumber(s.facturadosConDiferenciaPedidos);
     const bajaPedidos = valueOr(s.bajaPedidos, cfg.expectedTotals.bajaPedidos);
+    const montoRechazado = toNumber(f.montoRechazado);
+    const valorTotalPim = toNumber(f.valorTotalPim);
     const pctError = total > 0 ? Math.round(pedidosError / total * 100) : 0;
     const pctPim = total > 0 ? 100 - pctError : 0;
+    // pedidos PIM sin error de precio = total PIM menos los que sí tuvieron problema
+    const pimSinError = Math.max(0, pedidosPim - bajaPedidos - facturadosDiff);
 
     const flowRow = (label, val, cls = "") =>
       `<div class="flow-row ${cls}">
@@ -369,9 +374,10 @@
             <div class="flow-bucket-number red">${fmt(pedidosError)}</div>
             <div class="flow-bucket-title">Pedidos rechazados</div>
             <div class="flow-bucket-desc">
-              No había stock real o el precio era inválido. El sistema los rechazó antes de ingresar a PIM.
-              No generan pérdida directa, pero hay que devolver el dinero cobrado.
+              Pasaron a error por <strong>falta de stock</strong>. El sistema los rechazó antes de ingresar a PIM.
+              No generan pérdida directa, pero el dinero cobrado fue devuelto a los clientes.
             </div>
+            ${montoRechazado > 0 ? `<div class="flow-monto">Monto total reembolsado: <strong>${fmtMoney(montoRechazado)}</strong></div>` : ""}
             <div class="flow-rows">
               ${flowRow("Cancelación automática — reembolso por PayWay/VTEX", fmt(gestionAuto), "green")}
               ${flowRow("Reembolso manual completado el 22-05 — MercadoPago / GoCuotas", fmt(gestionManual), "orange")}
@@ -382,10 +388,13 @@
             <div class="flow-bucket-number blue">${fmt(pedidosPim)}</div>
             <div class="flow-bucket-title">Procesados en PIM</div>
             <div class="flow-bucket-desc">
-              Tenían stock real. Se asignaron a un depósito y avanzaron en el flujo operativo
-              con el precio incorrecto. Estos son los que generan pérdida económica real.
+              Tenían stock real y avanzaron normalmente.
+              <strong>La mayoría ingresó sin error de precio</strong> — solo un subconjunto tenía el precio incorrecto
+              y fue dado de baja o facturado con diferencia.
             </div>
+            ${valorTotalPim > 0 ? `<div class="flow-monto">Valor total en PIM: <strong>${fmtMoney(valorTotalPim)}</strong></div>` : ""}
             <div class="flow-rows">
+              ${flowRow("Sin error de precio — operaron con normalidad", fmt(pimSinError))}
               ${flowRow("Dados de baja por precio incorrecto — corregidos", fmt(bajaPedidos), "green")}
               ${flowRow("Facturados con precio incorrecto — ver pestaña PIM y bajas", fmt(facturadosDiff), facturadosDiff > 0 ? "red" : "")}
             </div>
@@ -429,18 +438,19 @@
     const hasPotencial = potencialPerdida > 0 && ticketActual > 0;
     const potentialCard = `
       <div class="loss-card loss-potential">
-        <div class="loss-card-eyebrow">2. Pérdida potencial — riesgo evitado</div>
+        <div class="loss-card-eyebrow">2. Riesgo de compensación — supuesto</div>
         <div class="loss-card-amount">${hasPotencial ? fmtMoney(potencialPerdida) : "—"}</div>
         <p class="loss-card-explain">
-          Si los <strong>${fmt(pedidosError)} pedidos rechazados</strong> hubieran avanzado hasta facturarse con el precio incorrecto,
-          esta habría sido la diferencia total respecto al precio correcto.
-          Muestra cuánto dinero se evitó perder al rechazarlos a tiempo.
+          <strong>Escenario hipotético:</strong> si los clientes con pedidos rechazados reclamaran y hubiera que
+          compensarlos entregando un producto similar al precio correcto de mercado,
+          la pérdida por pedido sería la diferencia entre el ticket promedio real y el precio con error.
+          No es una pérdida ocurrida — es el <strong>techo máximo de exposición</strong> ante reclamos masivos.
         </p>
         <div class="loss-detail-rows">
-          ${detailRow("Ticket promedio al precio correcto", fmtMoney(ticketActual))}
-          ${detailRow("Ticket promedio con precio del incidente", fmtMoney(ticketError))}
-          ${detailRow("Diferencia de precio por pedido", fmtMoney(brecha))}
-          ${detailRow(fmt(pedidosError) + " pedidos × diferencia de precio", fmtMoney(potencialPerdida), true)}
+          ${detailRow("Ticket promedio precio correcto (mercado)", fmtMoney(ticketActual))}
+          ${detailRow("Ticket promedio precio del incidente (lo que el cliente esperaba pagar)", fmtMoney(ticketError))}
+          ${detailRow("Diferencia por pedido a compensar", fmtMoney(brecha))}
+          ${detailRow(fmt(pedidosError) + " pedidos rechazados × diferencia", fmtMoney(potencialPerdida), true)}
         </div>
       </div>`;
 

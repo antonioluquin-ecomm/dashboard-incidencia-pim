@@ -1046,6 +1046,17 @@ tr.flagged td {
   line-height: 1.5;
 }
 
+.flow-monto {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.flow-monto strong { color: var(--text); font-family: Consolas, "SFMono-Regular", monospace; }
+
 .flow-rows {
   display: flex;
   flex-direction: column;

@@ -33,9 +33,9 @@
     pedidosError: [],
     pedidosErrorUnlocked: false,
     filters: {
-      errores: { search: "", field: null, value: null, page: 1, perPage: 50 },
+      errores: { search: "", field: null, value: null, store: null, page: 1, perPage: 50 },
       bajas: { search: "", dispatchOnly: false, page: 1, perPage: 25 },
-      sku: { search: "" }
+      sku: { search: "", store: null }
     }
   };
 
@@ -283,10 +283,12 @@
   }
 
   function renderAll() {
+    renderIncidentStatus();
     renderRiskStrip();
     renderIncidentContext();
     renderOrderFlow();
     renderFinancialImpactSection();
+    renderPimMejoras();
     renderPaymentBreakdown();
     renderStoreBreakdown();
     renderHourChart();
@@ -296,6 +298,16 @@
     renderSku();
     renderPimKpis();
     renderBajas();
+  }
+
+  function renderIncidentStatus() {
+    const el = $("#incidentStatusBadge");
+    if (!el) return;
+    const status = cfg.incidentStatus || "monitoring";
+    const labels = { active: "Incidente activo", monitoring: "En seguimiento", closed: "Incidente cerrado" };
+    const classes = { active: "badge-red", monitoring: "badge-orange", closed: "badge-green" };
+    el.textContent = labels[status] || labels.monitoring;
+    el.className = `badge ${classes[status] || classes.monitoring}`;
   }
 
   function renderRiskStrip() {
@@ -315,18 +327,35 @@
     const pedidosError = valueOr(s.pedidosError, cfg.expectedTotals.pedidosError);
     const pedidosPim = valueOr(s.pedidosPimUnicos, cfg.expectedTotals.pedidosPimUnicos);
     const total = pedidosError + pedidosPim;
+    const clientesUnicos = s.clientesErrorUnicos;
+
+    const clientesHtml = clientesUnicos != null
+      ? `<div class="context-clients-row">
+          <strong class="context-clients-val">${fmt(clientesUnicos)}</strong>
+          <span class="context-clients-note">clientes únicos con pedido rechazado · reclamos potenciales</span>
+        </div>`
+      : "";
+
     $("#incidentContext").innerHTML = `
       <div class="incident-context">
         <span class="badge badge-orange">Contenido · 22-05-2026</span>
         <p class="incident-context-text">
-          El 21 de mayo, credenciales de API de <strong>producción</strong> quedaron activas en ambiente QA durante el proyecto de multidepósitos.
-          Esto hizo que se enviaran precios y stock ficticios a <strong>Sporting y Woker</strong>.
-          En total, <strong>${fmt(total)} pedidos</strong> recibieron precios incorrectos:
-          <strong>${fmt(pedidosError)}</strong> fueron rechazados antes de procesar y
-          <strong>${fmt(pedidosPim)}</strong> llegaron a ingresar a PIM.
+          El 21 de mayo, algunos productos de <strong>Sporting y Woker</strong> mostraron precios
+          incorrectos (mucho más bajos de lo normal) y stock disponible que en realidad no existía.
+          Los clientes podían agregar esos productos al carrito y completar la compra sin ninguna advertencia.
+          En total, <strong>${fmt(total)} pedidos</strong> se vieron afectados:
+          <strong>${fmt(pedidosError)}</strong> fueron cancelados antes de procesarse y
+          <strong>${fmt(pedidosPim)}</strong> ingresaron al sistema de gestión de pedidos.
           El incidente fue contenido el 22-05 con cancelación automática masiva y reactivación de depósitos.
         </p>
-      </div>`;
+      </div>
+      <div class="explain-box">
+        <strong>¿Por qué pasó?</strong> Al desarrollar una nueva funcionalidad interna
+        (manejo de múltiples depósitos), el sistema de pruebas quedó conectado al entorno de producción por error.
+        Al actualizar precios y stock durante las pruebas, esos datos incorrectos se publicaron en los sitios reales de ambas tiendas.
+        El problema ya fue corregido y los valores correctos fueron enviados a Sporting y Woker el 22-05.
+      </div>
+      ${clientesHtml}`;
   }
 
   function renderOrderFlow() {
@@ -595,6 +624,48 @@
     renderPager("#pagerErrores", unlocked ? rows.length : 0, filter, renderPedidosError);
   }
 
+  function renderPimMejoras() {
+    const el = $("#pimMejoras");
+    if (!el) return;
+    el.innerHTML = `
+      <div class="section-subhead" style="margin-top:28px;">
+        <h3>Seguimiento y mejoras</h3>
+        <span>Acciones completadas · seguimiento pendiente · propuestas para evitar recurrencia</span>
+      </div>
+      <div class="story-grid">
+        <div class="story-card">
+          <h3>Acciones tomadas</h3>
+          <ul class="acciones-list">
+            <li class="done">Depósitos 01, 17 y 45 pausados — 21-05</li>
+            <li class="done">Sucursales notificadas para no despachar — 21-05 19:00</li>
+            <li class="done">Cancelación automática masiva hacia VTEX — 22-05 08:30</li>
+            <li class="done">Reembolsos manuales MP/GoCuotas — 620 pedidos — 22-05 17:00</li>
+            <li class="done">Bajas manuales de pedidos activos en PIM — 22-05 13:00</li>
+            <li class="done">Depósitos reactivados y normalización completa — 22-05 13:45</li>
+          </ul>
+        </div>
+        <div class="story-card">
+          <h3>Seguimiento en 2 semanas</h3>
+          <p>Medir el impacto real antes del 05-06-2026. Registrar:</p>
+          <ul class="acciones-list">
+            <li>Casos recibidos en contact center por este incidente</li>
+            <li>Cupones de descuento entregados como compensación</li>
+            <li>Cupones utilizados y su valor total</li>
+            <li>Pedidos despachados con precio incorrecto</li>
+            <li>Costo real de compensaciones pagadas</li>
+          </ul>
+        </div>
+        <div class="story-card">
+          <h3>Mejoras propuestas por PIM</h3>
+          <ul class="acciones-list">
+            <li><strong>Alertas automáticas</strong> — notificar cuando supere X pedidos con error en poco tiempo</li>
+            <li><strong>Umbral de precio</strong> — marcar como error si el precio difiere más de X% del precio base, antes de que el pedido avance</li>
+            <li><strong>Cancelación masiva desde PIM</strong> — botón que impacte directo en VTEX sin pasos manuales adicionales</li>
+          </ul>
+        </div>
+      </div>`;
+  }
+
   function renderTimeline() {
     const rows = state.cronologia.length ? state.cronologia : defaultTimeline();
     const typeLabel = { detection: "Detección", action: "Acción", escalation: "Escalado", resolution: "Resolución" };
@@ -630,9 +701,12 @@
   function renderSku() {
     const allRows = state.skuImpact || [];
     const search = normalizeText(state.filters.sku.search || "");
-    const rows = search
-      ? allRows.filter((row) => normalizeText(row.sku + " " + row.producto).includes(search))
-      : allRows;
+    const store = normalizeText(state.filters.sku.store || "");
+    const rows = allRows.filter((row) => {
+      if (store && !normalizeText(row.sitios || "").includes(store)) return false;
+      if (search && !normalizeText(row.sku + " " + row.producto).includes(search)) return false;
+      return true;
+    });
 
     const countEl = $("#countSku");
     if (countEl) countEl.textContent = `${fmt(rows.length)} SKUs`;
@@ -701,6 +775,7 @@
     if (btn.dataset.filterClear) {
       filter.field = null;
       filter.value = null;
+      filter.store = null;
       filter.dispatchOnly = false;
       filter.page = 1;
       $$(`[data-filter-table="${table}"]`).forEach((el) => el.classList.remove("active"));
@@ -708,25 +783,36 @@
       filter.dispatchOnly = !filter.dispatchOnly;
       filter.page = 1;
       btn.classList.toggle("active", filter.dispatchOnly);
+    } else if (btn.dataset.filterStore !== undefined) {
+      const same = filter.store === btn.dataset.filterStore;
+      filter.store = same ? null : btn.dataset.filterStore;
+      filter.page = 1;
+      $$(`[data-filter-table="${table}"]`).forEach((el) => {
+        if (el.dataset.filterStore !== undefined) el.classList.toggle("active", !same && el.dataset.filterStore === filter.store);
+      });
     } else {
       const same = filter.field === btn.dataset.filterField && filter.value === btn.dataset.filterValue;
       filter.field = same ? null : btn.dataset.filterField;
       filter.value = same ? null : btn.dataset.filterValue;
       filter.page = 1;
       $$(`[data-filter-table="${table}"]`).forEach((el) => {
-        if (!el.dataset.filterDispatch) el.classList.remove("active");
+        if (!el.dataset.filterDispatch && el.dataset.filterStore === undefined) el.classList.remove("active");
       });
       if (!same) btn.classList.add("active");
     }
 
     if (table === "errores") renderPedidosError();
     if (table === "bajas") renderBajas();
+    if (table === "sku") renderSku();
   }
 
   function applyFilter(rows, filter) {
     let result = rows;
     if (filter.field && filter.value) {
       result = result.filter((row) => normalizeText(row[filter.field]) === normalizeText(filter.value));
+    }
+    if (filter.store) {
+      result = result.filter((row) => normalizeText(row.sitio || "").includes(normalizeText(filter.store)));
     }
     if (filter.search) {
       result = result.filter((row) => Object.values(row).some((value) => String(value || "").toLowerCase().includes(filter.search)));

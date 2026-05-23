@@ -151,8 +151,10 @@ function buildSummary_(pedidosError, pedidosPim, pedidosVtex, pedidosVtexError) 
   var pedidoVtexIds = uniqueValues_(pedidosVtex, ["Order", "Nro Pedido", "nro_pedido_canal"]);
   var errorSkuIds = uniqueValues_(pedidosVtexError, ["Reference Code", "SKU", "Sku", "sku", "ID_SKU"]);
   var pimMetrics = buildPimPriceMetrics_(pedidosPim);
+  var clientesErrorUnicos = uniqueValues_(pedidosError, ["email", "Email", "mail", "Mail", "correo", "Correo", "E-mail"]).length || null;
 
   return {
+    clientesErrorUnicos: clientesErrorUnicos,
     pedidosTotalesIncidente: pedidosError.length + pedidoPimIds.length,
     pedidosError: pedidosError.length,
     gestionManual: manual,

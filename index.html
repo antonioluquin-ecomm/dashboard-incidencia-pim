@@ -14,7 +14,7 @@
 
   <header class="site-header">
     <div>
-      <p class="eyebrow">Analisis de incidencia PIM</p>
+      <p class="eyebrow">Analisis de incidencia PIM &nbsp;<span id="incidentStatusBadge" class="badge"></span></p>
       <h1>Incidente precio y stock</h1>
     </div>
     <div class="header-actions">
@@ -53,6 +53,7 @@
         <span>Las dos formas de medir las pérdidas del incidente</span>
       </div>
       <div id="financialImpactSection"></div>
+      <div id="pimMejoras"></div>
 
       <div class="dashboard-grid">
         <article class="panel">
@@ -111,6 +112,8 @@
         <input class="search-input" id="searchErrores" type="search" placeholder="Buscar pedido, medio de pago o fecha">
         <button class="filter-btn" type="button" data-filter-table="errores" data-filter-field="tipo_pago" data-filter-value="mercado_pago_pro">MercadoPago Pro</button>
         <button class="filter-btn" type="button" data-filter-table="errores" data-filter-field="tipo_pago" data-filter-value="modo">MODO</button>
+        <button class="filter-btn" type="button" data-filter-table="errores" data-filter-store="sporting">Sporting</button>
+        <button class="filter-btn" type="button" data-filter-table="errores" data-filter-store="woker">Woker</button>
         <button class="filter-btn" type="button" data-filter-table="errores" data-filter-clear="true">Limpiar</button>
         <span class="row-count" id="countErrores"></span>
         <button class="filter-btn" type="button" id="exportErroresBtn">Exportar CSV</button>
@@ -171,6 +174,9 @@
 
       <div class="toolbar" id="skuToolbar">
         <input class="search-input" id="searchSku" type="search" placeholder="Buscar SKU o producto">
+        <button class="filter-btn" type="button" data-filter-table="sku" data-filter-store="sporting">Sporting</button>
+        <button class="filter-btn" type="button" data-filter-table="sku" data-filter-store="woker">Woker</button>
+        <button class="filter-btn" type="button" data-filter-table="sku" data-filter-clear="true">Limpiar</button>
         <span class="row-count" id="countSku"></span>
       </div>
 

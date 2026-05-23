@@ -273,7 +273,7 @@ h1 {
 }
 
 .explain-box {
-  margin: -8px 0 24px;
+  margin: 12px 0 0;
   padding: 16px 18px;
   border: 1px solid rgba(85,167,255,.28);
   border-radius: 8px;
@@ -283,6 +283,65 @@ h1 {
 }
 
 .explain-box strong {
+  color: var(--text);
+}
+
+/* Context: unique clients metric */
+.context-clients-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 13px 18px;
+  border: 1px solid rgba(85,167,255,.28);
+  border-radius: 8px;
+  background: rgba(85,167,255,.07);
+}
+
+.context-clients-val {
+  font-size: 22px;
+  font-weight: 850;
+  color: var(--blue);
+}
+
+.context-clients-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Seguimiento y mejoras: acciones list */
+.acciones-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.acciones-list li {
+  position: relative;
+  padding: 7px 0 7px 22px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  border-bottom: 1px solid var(--border);
+}
+
+.acciones-list li:last-child {
+  border-bottom: none;
+}
+
+.acciones-list li::before {
+  content: "○";
+  position: absolute;
+  left: 0;
+  color: var(--quiet);
+}
+
+.acciones-list li.done::before {
+  content: "✓";
+  color: var(--green);
+}
+
+.acciones-list li strong {
   color: var(--text);
 }
 

@@ -13,5 +13,7 @@ window.PIM_INCIDENT_CONFIG = {
   referenceMetrics: {
     ticketPromedioActual: 135000
   },
-  manualPaymentMethods: ["mercado_pago_pro", "gocuotas"]
+  manualPaymentMethods: ["mercado_pago_pro", "gocuotas"],
+  // Estado del incidente: "active" | "monitoring" | "closed"
+  incidentStatus: "monitoring"
 };
